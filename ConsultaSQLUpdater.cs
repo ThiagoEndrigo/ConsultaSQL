@@ -75,69 +75,72 @@ $download = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($Downloa
 $argsJson = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($Args64))
 $appArgs = @((ConvertFrom-Json -InputObject $argsJson))
 $quoted = @()
-foreach ($arg in $appArgs) { $quoted += ('""' + ([string]$arg).Replace('""','\""') + '""') }
+$dq = [char]34
+foreach ($arg in $appArgs) { $quoted += ($dq + ([string]$arg).Replace([string]$dq,([string][char]92 + $dq)) + $dq) }
 $argLine = [string]::Join(' ', $quoted)
 $workDir = Split-Path -Parent $target
 $scriptPath = $MyInvocation.MyCommand.Path
+$backup = $target + '.previous'
+$installed = $false
+$newProcess = $null
 try {
-    for ($i=0; $i -lt 120; $i++) {
-        $running = Get-Process -Id $ProcessId -ErrorAction SilentlyContinue
-        if ($null -eq $running) { break }
-        Start-Sleep -Milliseconds 250
+    $oldProcess = Get-Process -Id $ProcessId -ErrorAction SilentlyContinue
+    if ($null -ne $oldProcess) {
+        $oldProcess.WaitForExit(120000)
+        $oldProcess.Refresh()
+        if (-not $oldProcess.HasExited) { throw 'O programa anterior ainda está em execução.' }
     }
-    $backup = $target + '.previous'
-    try { Copy-Item -LiteralPath $target -Destination $backup -Force } catch {}
-    $installed = $false
-    for ($i=0; $i -lt 20; $i++) {
+
+    if (-not (Test-Path -LiteralPath $target)) { throw 'O executável instalado não foi encontrado.' }
+    if (Test-Path -LiteralPath $backup) { Remove-Item -LiteralPath $backup -Force }
+    Copy-Item -LiteralPath $target -Destination $backup -Force
+    if (-not (Test-Path -LiteralPath $backup)) { throw 'Não foi possível criar uma cópia de segurança da versão atual.' }
+
+    for ($i=0; $i -lt 30; $i++) {
         try {
             Copy-Item -LiteralPath $download -Destination $target -Force
             $sourceHash = (Get-FileHash -LiteralPath $download -Algorithm SHA256).Hash
             $targetHash = (Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash
             if ($sourceHash -eq $targetHash) { $installed = $true; break }
-        } catch {}
+        } catch { }
         Start-Sleep -Milliseconds 500
     }
-    if (-not $installed) {
-        try { if (Test-Path -LiteralPath $backup) { Copy-Item -LiteralPath $backup -Destination $target -Force } } catch {}
-        try { Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.MessageBox]::Show('O Windows não permitiu substituir o executável. O programa antigo será aberto novamente. Instale-o em uma pasta com permissão de gravação.','Atualização do Consulta SQL',[System.Windows.Forms.MessageBoxButtons]::OK,[System.Windows.Forms.MessageBoxIcon]::Warning) | Out-Null } catch {}
-        if ($argLine.Length -gt 0) { Start-Process -FilePath $target -ArgumentList $argLine -WorkingDirectory $workDir }
-        else { Start-Process -FilePath $target -WorkingDirectory $workDir }
-    } else {
-        $newProcess = $null
-        try {
-            if ($argLine.Length -gt 0) { $newProcess = Start-Process -FilePath $target -ArgumentList $argLine -WorkingDirectory $workDir -PassThru }
-            else { $newProcess = Start-Process -FilePath $target -WorkingDirectory $workDir -PassThru }
-        } catch {}
-        if ($null -ne $newProcess) {
-            try { $newProcess.WaitForInputIdle(10000) | Out-Null } catch {}
-            Start-Sleep -Milliseconds 700
-            try { $newProcess.Refresh() } catch {}
-        }
-        if (($null -ne $newProcess) -and (-not $newProcess.HasExited)) {
-            for ($cleanupAttempt=0; $cleanupAttempt -lt 20; $cleanupAttempt++) {
-                try { if (Test-Path -LiteralPath $backup) { Remove-Item -LiteralPath $backup -Force -ErrorAction Stop } } catch {}
-                if (-not (Test-Path -LiteralPath $backup)) { break }
-                Start-Sleep -Milliseconds 500
-            }
-        } else {
-            $restored = $false
-            try { if (Test-Path -LiteralPath $backup) { Copy-Item -LiteralPath $backup -Destination $target -Force; $restored = $true } } catch {}
-            if ($restored) {
-                try { Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.MessageBox]::Show('A nova versão não iniciou corretamente. A versão anterior foi restaurada.','Atualização do Consulta SQL',[System.Windows.Forms.MessageBoxButtons]::OK,[System.Windows.Forms.MessageBoxIcon]::Warning) | Out-Null } catch {}
-                if ($argLine.Length -gt 0) { Start-Process -FilePath $target -ArgumentList $argLine -WorkingDirectory $workDir }
-                else { Start-Process -FilePath $target -WorkingDirectory $workDir }
-            }
-        }
-    }} catch {}
-        try { Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.MessageBox]::Show('O Windows não permitiu substituir o executável. O programa antigo será aberto novamente. Instale-o em uma pasta com permissão de gravação.','Atualização do Consulta SQL',[System.Windows.Forms.MessageBoxButtons]::OK,[System.Windows.Forms.MessageBoxIcon]::Warning) | Out-Null } catch {}
+    if (-not $installed) { throw 'O Windows não permitiu substituir o executável.' }
+
+    if ($argLine.Length -gt 0) { $newProcess = Start-Process -FilePath $target -ArgumentList $argLine -WorkingDirectory $workDir -PassThru }
+    else { $newProcess = Start-Process -FilePath $target -WorkingDirectory $workDir -PassThru }
+    if ($null -eq $newProcess) { throw 'O Windows não iniciou a nova versão.' }
+    try { $newProcess.WaitForInputIdle(15000) | Out-Null } catch { }
+    Start-Sleep -Seconds 2
+    $newProcess.Refresh()
+    if ($newProcess.HasExited) { throw 'A nova versão encerrou durante a inicialização.' }
+
+    for ($cleanupAttempt=0; $cleanupAttempt -lt 20; $cleanupAttempt++) {
+        try { Remove-Item -LiteralPath $backup -Force -ErrorAction Stop } catch { }
+        if (-not (Test-Path -LiteralPath $backup)) { break }
+        Start-Sleep -Milliseconds 500
     }
-    if ($argLine.Length -gt 0) { Start-Process -FilePath $target -ArgumentList $argLine -WorkingDirectory $workDir }
-    else { Start-Process -FilePath $target -WorkingDirectory $workDir }
 } catch {
-    try { Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.MessageBox]::Show('Não foi possível concluir a atualização. Abra o programa novamente.','Atualização do Consulta SQL',[System.Windows.Forms.MessageBoxButtons]::OK,[System.Windows.Forms.MessageBoxIcon]::Warning) | Out-Null } catch {}
+    $message = $_.Exception.Message
+    if ($newProcess -ne $null) {
+        try { $newProcess.Refresh(); if (-not $newProcess.HasExited) { Stop-Process -Id $newProcess.Id -Force } } catch { }
+    }
+    if (Test-Path -LiteralPath $backup) {
+        try { Copy-Item -LiteralPath $backup -Destination $target -Force } catch { }
+    }
+    try {
+        Add-Type -AssemblyName System.Windows.Forms
+        [System.Windows.Forms.MessageBox]::Show(('A atualização não foi concluída. A versão anterior foi restaurada, se necessário. Abra o programa novamente. Detalhe: {0}' -f $message),'Atualização do Consulta SQL',[System.Windows.Forms.MessageBoxButtons]::OK,[System.Windows.Forms.MessageBoxIcon]::Warning) | Out-Null
+    } catch { }
+    if (Test-Path -LiteralPath $target) {
+        try {
+            if ($argLine.Length -gt 0) { Start-Process -FilePath $target -ArgumentList $argLine -WorkingDirectory $workDir }
+            else { Start-Process -FilePath $target -WorkingDirectory $workDir }
+        } catch { }
+    }
 } finally {
-    try { Remove-Item -LiteralPath $download -Force -ErrorAction SilentlyContinue } catch {}
-    try { Remove-Item -LiteralPath $scriptPath -Force -ErrorAction SilentlyContinue } catch {}
+    try { if (Test-Path -LiteralPath $download) { Remove-Item -LiteralPath $download -Force -ErrorAction SilentlyContinue } } catch { }
+    try { if (Test-Path -LiteralPath $scriptPath) { Remove-Item -LiteralPath $scriptPath -Force -ErrorAction SilentlyContinue } } catch { }
 }";
         File.WriteAllText(scriptPath,script,new UTF8Encoding(true));
         string powershell=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows),@"System32\WindowsPowerShell\v1.0\powershell.exe");if(!File.Exists(powershell))powershell="powershell.exe";
