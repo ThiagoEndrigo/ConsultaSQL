@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -99,6 +99,32 @@ try {
     }
     if (-not $installed) {
         try { if (Test-Path -LiteralPath $backup) { Copy-Item -LiteralPath $backup -Destination $target -Force } } catch {}
+        try { Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.MessageBox]::Show('O Windows não permitiu substituir o executável. O programa antigo será aberto novamente. Instale-o em uma pasta com permissão de gravação.','Atualização do Consulta SQL',[System.Windows.Forms.MessageBoxButtons]::OK,[System.Windows.Forms.MessageBoxIcon]::Warning) | Out-Null } catch {}
+        if ($argLine.Length -gt 0) { Start-Process -FilePath $target -ArgumentList $argLine -WorkingDirectory $workDir }
+        else { Start-Process -FilePath $target -WorkingDirectory $workDir }
+    } else {
+        $newProcess = $null
+        try {
+            if ($argLine.Length -gt 0) { $newProcess = Start-Process -FilePath $target -ArgumentList $argLine -WorkingDirectory $workDir -PassThru }
+            else { $newProcess = Start-Process -FilePath $target -WorkingDirectory $workDir -PassThru }
+        } catch {}
+        if ($null -ne $newProcess) {
+            try { $newProcess.WaitForInputIdle(10000) | Out-Null } catch {}
+            Start-Sleep -Milliseconds 700
+            try { $newProcess.Refresh() } catch {}
+        }
+        if (($null -ne $newProcess) -and (-not $newProcess.HasExited)) {
+            try { Remove-Item -LiteralPath $backup -Force -ErrorAction SilentlyContinue } catch {}
+        } else {
+            $restored = $false
+            try { if (Test-Path -LiteralPath $backup) { Copy-Item -LiteralPath $backup -Destination $target -Force; $restored = $true } } catch {}
+            if ($restored) {
+                try { Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.MessageBox]::Show('A nova versão não iniciou corretamente. A versão anterior foi restaurada.','Atualização do Consulta SQL',[System.Windows.Forms.MessageBoxButtons]::OK,[System.Windows.Forms.MessageBoxIcon]::Warning) | Out-Null } catch {}
+                if ($argLine.Length -gt 0) { Start-Process -FilePath $target -ArgumentList $argLine -WorkingDirectory $workDir }
+                else { Start-Process -FilePath $target -WorkingDirectory $workDir }
+            }
+        }
+    }} catch {}
         try { Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.MessageBox]::Show('O Windows não permitiu substituir o executável. O programa antigo será aberto novamente. Instale-o em uma pasta com permissão de gravação.','Atualização do Consulta SQL',[System.Windows.Forms.MessageBoxButtons]::OK,[System.Windows.Forms.MessageBoxIcon]::Warning) | Out-Null } catch {}
     }
     if ($argLine.Length -gt 0) { Start-Process -FilePath $target -ArgumentList $argLine -WorkingDirectory $workDir }
