@@ -1,0 +1,37 @@
+﻿name: Publicar versão
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-release:
+    runs-on: windows-latest
+    steps:
+      - name: Baixar o código da tag
+        uses: actions/checkout@v4
+
+      - name: Compilar e publicar executável
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = $env:GITHUB_REF_NAME
+          $match = [regex]::Match($tag, '^v(?<version>\d+\.\d+\.\d+)$')
+          if (-not $match.Success) { throw "Tag inválida: $tag" }
+          $expectedVersion = "v$($match.Groups['version'].Value)"
+          $source = Get-Content -Raw -LiteralPath 'ConsultaSQL.cs'
+          if ($source -notmatch ('AssemblyInformationalVersion\("' + [regex]::Escape($expectedVersion) + '"\)')) {
+            throw "A versão declarada no código não corresponde à tag $tag."
+          }
+          $compiler = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
+          if (-not (Test-Path -LiteralPath $compiler)) { throw 'Compilador C# do .NET Framework não encontrado.' }
+          & $compiler /nologo /target:winexe /out:ConsultaSQL.exe /win32icon:ConsultaSQL.ico /r:System.Windows.Forms.dll /r:System.Drawing.dll /r:System.Data.dll /r:System.Core.dll /r:System.Web.Extensions.dll ConsultaSQL.cs ConsultaSQLUpdater.cs
+          if ($LASTEXITCODE -ne 0) { throw "Compilação falhou com código $LASTEXITCODE" }
+          $binaryVersion = (Get-Item -LiteralPath 'ConsultaSQL.exe').VersionInfo.ProductVersion
+          if ($binaryVersion -ne $expectedVersion) { throw "O executável está na versão $binaryVersion, esperada $expectedVersion." }
+          gh release create $tag '.\ConsultaSQL.exe' --title "Consulta SQL Firebird $tag" --notes "Versão publicada automaticamente a partir da tag $tag."

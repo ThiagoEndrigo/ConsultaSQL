@@ -1,0 +1,13 @@
+﻿# Dados de bancos e arquivos gerados
+*.FDB
+*.GDB
+*.FBK
+*.SQL
+*.CSV
+*.HTML
+*.JSON
+*.TXT
+
+# Executáveis e cópias locais
+*.exe
+*.bak
