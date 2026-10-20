@@ -114,7 +114,11 @@ try {
             try { $newProcess.Refresh() } catch {}
         }
         if (($null -ne $newProcess) -and (-not $newProcess.HasExited)) {
-            try { Remove-Item -LiteralPath $backup -Force -ErrorAction SilentlyContinue } catch {}
+            for ($cleanupAttempt=0; $cleanupAttempt -lt 20; $cleanupAttempt++) {
+                try { if (Test-Path -LiteralPath $backup) { Remove-Item -LiteralPath $backup -Force -ErrorAction Stop } } catch {}
+                if (-not (Test-Path -LiteralPath $backup)) { break }
+                Start-Sleep -Milliseconds 500
+            }
         } else {
             $restored = $false
             try { if (Test-Path -LiteralPath $backup) { Copy-Item -LiteralPath $backup -Destination $target -Force; $restored = $true } } catch {}
@@ -145,3 +149,4 @@ try {
     static string Base64(string value) { return Convert.ToBase64String(Encoding.UTF8.GetBytes(value??"")); }
     static void TryDelete(string path) { try { if(File.Exists(path))File.Delete(path); } catch {} }
 }
+
