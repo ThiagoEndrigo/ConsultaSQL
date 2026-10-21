@@ -19,37 +19,45 @@ internal static class ConsultaSQLUpdater {
     const string AssetBase="https://github.com/ThiagoEndrigo/ConsultaSQL/releases/download/";
     static readonly JavaScriptSerializer Json=new JavaScriptSerializer{MaxJsonLength=4*1024*1024};
 
+    public static string LastDiagnostic="";
+
     public static UpdateCandidate CheckForUpdate() {
+        string downloadPath=null;
+        LastDiagnostic="";
         try {
             ServicePointManager.SecurityProtocol=SecurityProtocolType.Tls12;
-            string json=GetText(ApiUrl,8000);
+            string json=GetText(ApiUrl,20000);
             Dictionary<string,object> release=Json.Deserialize<Dictionary<string,object>>(json);
-            if(release==null||!release.ContainsKey("tag_name")||!release.ContainsKey("assets"))return null;
+            if(release==null||!release.ContainsKey("tag_name")||!release.ContainsKey("assets")){LastDiagnostic="O GitHub não retornou os dados esperados da versão mais recente.";return null;}
             string tag=Convert.ToString(release["tag_name"],CultureInfo.InvariantCulture);
-            Version newest;if(String.IsNullOrWhiteSpace(tag)||!Version.TryParse(tag.TrimStart('v','V'),out newest))return null;
+            Version newest;if(String.IsNullOrWhiteSpace(tag)||!Version.TryParse(tag.TrimStart('v','V'),out newest)){LastDiagnostic="A versão informada pelo GitHub não pôde ser interpretada.";return null;}
             Version current=typeof(Program).Assembly.GetName().Version;
-            if(newest<=current)return null;
+            if(newest<=current){LastDiagnostic="O programa já está atualizado. Versão instalada: "+current.ToString()+".";return null;}
             object[] assets=release["assets"] as object[];
             if(assets==null) { ArrayList list=release["assets"] as ArrayList;if(list!=null)assets=list.ToArray(); }
-            if(assets==null)return null;
+            if(assets==null){LastDiagnostic="A release "+tag+" não contém uma lista válida de arquivos.";return null;}
             string url="";
             foreach(object item in assets) {
                 Dictionary<string,object> asset=item as Dictionary<string,object>;
                 if(asset==null||!asset.ContainsKey("name")||!asset.ContainsKey("browser_download_url"))continue;
                 if(String.Equals(Convert.ToString(asset["name"],CultureInfo.InvariantCulture),"ConsultaSQL.exe",StringComparison.OrdinalIgnoreCase)){url=Convert.ToString(asset["browser_download_url"],CultureInfo.InvariantCulture);break;}
             }
-            Uri downloadUri;if(String.IsNullOrWhiteSpace(url)||!Uri.TryCreate(url,UriKind.Absolute,out downloadUri)||downloadUri.Scheme!=Uri.UriSchemeHttps||!String.Equals(downloadUri.Host,"github.com",StringComparison.OrdinalIgnoreCase)||!downloadUri.AbsolutePath.StartsWith("/ThiagoEndrigo/ConsultaSQL/releases/download/",StringComparison.OrdinalIgnoreCase))return null;
+            Uri downloadUri;if(String.IsNullOrWhiteSpace(url)||!Uri.TryCreate(url,UriKind.Absolute,out downloadUri)||downloadUri.Scheme!=Uri.UriSchemeHttps||!String.Equals(downloadUri.Host,"github.com",StringComparison.OrdinalIgnoreCase)||!downloadUri.AbsolutePath.StartsWith("/ThiagoEndrigo/ConsultaSQL/releases/download/",StringComparison.OrdinalIgnoreCase)){LastDiagnostic="A release "+tag+" não possui um executável ConsultaSQL.exe válido.";return null;}
             string folder=Path.Combine(Path.GetTempPath(),"ConsultaSQL-Atualizacao");Directory.CreateDirectory(folder);
-            string downloadPath=Path.Combine(folder,"ConsultaSQL-"+newest.ToString()+"-"+Guid.NewGuid().ToString("N")+".exe");
-            DownloadFile(downloadUri.AbsoluteUri,downloadPath,60000);
-            FileInfo info=new FileInfo(downloadPath);if(info.Length<65536||info.Length>50L*1024L*1024L){TryDelete(downloadPath);return null;}
-            using(FileStream file=File.OpenRead(downloadPath)){if(file.ReadByte()!='M'||file.ReadByte()!='Z'){TryDelete(downloadPath);return null;}}
+            downloadPath=Path.Combine(folder,"ConsultaSQL-"+newest.ToString()+"-"+Guid.NewGuid().ToString("N")+".exe");
+            DownloadFile(downloadUri.AbsoluteUri,downloadPath,120000);
+            FileInfo info=new FileInfo(downloadPath);if(info.Length<65536||info.Length>50L*1024L*1024L){TryDelete(downloadPath);downloadPath=null;LastDiagnostic="O executável baixado está fora do tamanho esperado.";return null;}
+            using(FileStream file=File.OpenRead(downloadPath)){if(file.ReadByte()!='M'||file.ReadByte()!='Z'){TryDelete(downloadPath);downloadPath=null;LastDiagnostic="O arquivo baixado não parece ser um executável válido do Windows.";return null;}}
             string productVersion=FileVersionInfo.GetVersionInfo(downloadPath).ProductVersion??"";Version binaryVersion;
-            if(!Version.TryParse(productVersion.Trim().TrimStart('v','V'),out binaryVersion)||binaryVersion!=newest){TryDelete(downloadPath);return null;}
+            if(!Version.TryParse(productVersion.Trim().TrimStart('v','V'),out binaryVersion)||binaryVersion!=newest){TryDelete(downloadPath);downloadPath=null;LastDiagnostic="A versão do executável baixado não corresponde à versão publicada ("+tag+").";return null;}
+            LastDiagnostic="Nova versão "+tag+" encontrada.";
             return new UpdateCandidate{Tag=tag,DownloadPath=downloadPath,ReleaseUrl=url};
-        } catch { return null; }
+        } catch(Exception ex) {
+            if(!String.IsNullOrWhiteSpace(downloadPath))TryDelete(downloadPath);
+            LastDiagnostic="Não foi possível verificar a atualização. Confira a internet ou o acesso ao GitHub. Detalhe: "+ex.GetType().Name+": "+ex.Message;
+            return null;
+        }
     }
-
     static string GetText(string url,int timeout) {
         HttpWebRequest request=(HttpWebRequest)WebRequest.Create(url);request.Method="GET";request.UserAgent="ConsultaSQL-Firebird-Updater";request.Accept="application/vnd.github+json";request.Timeout=timeout;request.ReadWriteTimeout=timeout;request.Headers[HttpRequestHeader.CacheControl]="no-cache";
         using(HttpWebResponse response=(HttpWebResponse)request.GetResponse())using(Stream stream=response.GetResponseStream())using(StreamReader reader=new StreamReader(stream,Encoding.UTF8)){return reader.ReadToEnd();}
