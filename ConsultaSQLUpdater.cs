@@ -85,6 +85,7 @@ $staged = $target + '.update'
 $installed = $false
 $lastInstallError = 'Nenhum detalhe adicional foi informado pelo Windows.'
 $newProcess = $null
+$retryStarted = $false
 try {
     $oldProcess = Get-Process -Id $ProcessId -ErrorAction SilentlyContinue
     if ($null -ne $oldProcess) {
@@ -133,9 +134,15 @@ try {
         Start-Sleep -Milliseconds 500
     }
 } catch {
-    $message = $_.Exception.Message
-    if ($message -match '(?i)access.*denied|acesso negado|unauthorizedaccess') { $message = ('Sem permissão para gravar na pasta do programa. Instale-o em uma pasta do usuário ou execute-o com permissão de administrador. Detalhe: {0}' -f $message) }
-    elseif ($message -match '(?i)being used by another process|used by another process|em uso por outro processo|sharing violation') { $message = ('Outro processo ainda está usando o executável. Feche as outras instâncias e tente novamente. Detalhe: {0}' -f $message) }
+    $rawError = $_.Exception.Message
+    $hresult = '0x{0:X8}' -f [BitConverter]::ToUInt32([BitConverter]::GetBytes([int]$_.Exception.HResult),0)
+    $cause = 'O Windows bloqueou a operação por uma causa não classificada.'
+    $action = 'Confira a mensagem técnica e tente novamente.'
+    if ($hresult -eq '0x80070005' -or $rawError -match '(?i)access.*denied|acesso negado|unauthorizedaccess') { $cause = 'A conta atual não tem permissão para gravar na pasta do programa.'; $action = 'Feche o programa e tente executá-lo como administrador, ou instale-o em uma pasta do usuário.' }
+    elseif ($hresult -eq '0x80070020' -or $hresult -eq '0x80070021' -or $rawError -match '(?i)being used by another process|used by another process|em uso por outro processo|sharing violation|still running|ainda est[aá] em execu[cç][aã]o') { $cause = 'O executável está aberto ou bloqueado por outro processo.'; $action = 'Feche outras instâncias do ConsultaSQL. Se necessário, aguarde o antivírus concluir a verificação e tente novamente.' }
+    elseif ($hresult -eq '0x80070002' -or $hresult -eq '0x80070003') { $cause = 'O arquivo ou a pasta da instalação não foi encontrado.'; $action = 'Confira se o executável e a pasta de instalação ainda existem.' }
+    elseif ($hresult -eq '0x80070070') { $cause = 'Não há espaço livre suficiente para concluir a atualização.'; $action = 'Libere espaço no disco e tente novamente.' }
+    $message = $cause + ""`r`n"" + $action + ""`r`nCódigo do Windows: "" + $hresult + ""`r`nDetalhe técnico: "" + $rawError
     if ($newProcess -ne $null) {
         try { $newProcess.Refresh(); if (-not $newProcess.HasExited) { Stop-Process -Id $newProcess.Id -Force }; $newProcess.WaitForExit(15000) } catch { }
     }
@@ -152,17 +159,32 @@ try {
     }
     try {
         Add-Type -AssemblyName System.Windows.Forms
-        [System.Windows.Forms.MessageBox]::Show(('A atualização não foi concluída. A versão anterior foi restaurada, se necessário. Abra o programa novamente. Detalhe: {0}' -f $message),'Atualização do Consulta SQL',[System.Windows.Forms.MessageBoxButtons]::OK,[System.Windows.Forms.MessageBoxIcon]::Warning) | Out-Null
+        $prompt = 'A atualização não foi concluída. A versão anterior foi restaurada, se necessário.' + [Environment]::NewLine + [Environment]::NewLine + $message + [Environment]::NewLine + [Environment]::NewLine + 'Deseja tentar atualizar novamente agora?'
+        $choice = [System.Windows.Forms.MessageBox]::Show($prompt,'Diagnóstico da atualização',[System.Windows.Forms.MessageBoxButtons]::RetryCancel,[System.Windows.Forms.MessageBoxIcon]::Warning,[System.Windows.Forms.MessageBoxDefaultButton]::Button2)
+        if ($choice -eq [System.Windows.Forms.DialogResult]::Retry) {
+            try {
+                $retryScript = $scriptPath + '.retry.ps1'
+                Copy-Item -LiteralPath $scriptPath -Destination $retryScript -Force
+                $powershellPath = Join-Path ([Environment]::GetFolderPath([Environment+SpecialFolder]::Windows)) 'System32\WindowsPowerShell\v1.0\powershell.exe'
+                if (-not (Test-Path -LiteralPath $powershellPath)) { $powershellPath = 'powershell.exe' }
+                $retryArguments = '-NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File ' + [char]34 + $retryScript + [char]34 + ' -1 ' + [char]34 + $Target64 + [char]34 + ' ' + [char]34 + $Download64 + [char]34 + ' ' + [char]34 + $Args64 + [char]34
+                Start-Process -FilePath $powershellPath -ArgumentList $retryArguments -WorkingDirectory $workDir -WindowStyle Hidden
+                $retryStarted = $true
+            } catch {
+                [System.Windows.Forms.MessageBox]::Show(('Não foi possível iniciar a nova tentativa. Detalhe: {0}' -f $_.Exception.Message),'Falha ao repetir atualização',[System.Windows.Forms.MessageBoxButtons]::OK,[System.Windows.Forms.MessageBoxIcon]::Error) | Out-Null
+            }
+        }
+        if (-not $retryStarted) { [System.Windows.Forms.MessageBox]::Show(('A atualização não foi concluída. A versão anterior foi restaurada, se necessário. Detalhes: {0}' -f $message),'Atualização do Consulta SQL',[System.Windows.Forms.MessageBoxButtons]::OK,[System.Windows.Forms.MessageBoxIcon]::Warning) | Out-Null }
     } catch { }
-    if (Test-Path -LiteralPath $target) {
+    if (-not $retryStarted -and (Test-Path -LiteralPath $target)) {
         try {
             if ($argLine.Length -gt 0) { Start-Process -FilePath $target -ArgumentList $argLine -WorkingDirectory $workDir }
             else { Start-Process -FilePath $target -WorkingDirectory $workDir }
         } catch { }
     }
 } finally {
-    try { if (Test-Path -LiteralPath $staged) { Remove-Item -LiteralPath $staged -Force -ErrorAction SilentlyContinue } } catch { }
-    try { if (Test-Path -LiteralPath $download) { Remove-Item -LiteralPath $download -Force -ErrorAction SilentlyContinue } } catch { }
+    try { if (-not $retryStarted -and (Test-Path -LiteralPath $staged)) { Remove-Item -LiteralPath $staged -Force -ErrorAction SilentlyContinue } } catch { }
+    try { if (-not $retryStarted -and (Test-Path -LiteralPath $download)) { Remove-Item -LiteralPath $download -Force -ErrorAction SilentlyContinue } } catch { }
     try { if (Test-Path -LiteralPath $scriptPath) { Remove-Item -LiteralPath $scriptPath -Force -ErrorAction SilentlyContinue } } catch { }
 }";
         File.WriteAllText(scriptPath,script,new UTF8Encoding(true));
