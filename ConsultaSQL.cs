@@ -13,9 +13,9 @@ using System.Windows.Forms;
 
 [assembly: System.Reflection.AssemblyTitle("Consulta SQL Firebird")]
 [assembly: System.Reflection.AssemblyProduct("Consulta SQL Firebird")]
-[assembly: System.Reflection.AssemblyVersion("0.1.29.0")]
-[assembly: System.Reflection.AssemblyFileVersion("0.1.29.0")]
-[assembly: System.Reflection.AssemblyInformationalVersion("v0.1.29")]
+[assembly: System.Reflection.AssemblyVersion("0.1.30.0")]
+[assembly: System.Reflection.AssemblyFileVersion("0.1.30.0")]
+[assembly: System.Reflection.AssemblyInformationalVersion("v0.1.30")]
 
 internal static class FirebirdOutputText {
     public static readonly Encoding Encoding = System.Text.Encoding.GetEncoding(65001, EncoderFallback.ReplacementFallback, new Windows1252DecoderFallback());
