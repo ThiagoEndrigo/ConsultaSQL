@@ -13,9 +13,9 @@ using System.Windows.Forms;
 
 [assembly: System.Reflection.AssemblyTitle("Consulta SQL Firebird")]
 [assembly: System.Reflection.AssemblyProduct("Consulta SQL Firebird")]
-[assembly: System.Reflection.AssemblyVersion("0.1.28.0")]
-[assembly: System.Reflection.AssemblyFileVersion("0.1.28.0")]
-[assembly: System.Reflection.AssemblyInformationalVersion("v0.1.28")]
+[assembly: System.Reflection.AssemblyVersion("0.1.29.0")]
+[assembly: System.Reflection.AssemblyFileVersion("0.1.29.0")]
+[assembly: System.Reflection.AssemblyInformationalVersion("v0.1.29")]
 
 internal static class FirebirdOutputText {
     public static readonly Encoding Encoding = System.Text.Encoding.GetEncoding(65001, EncoderFallback.ReplacementFallback, new Windows1252DecoderFallback());
@@ -46,6 +46,14 @@ internal sealed class SuggestionPopupForm : Form {
     protected override CreateParams CreateParams { get { CreateParams cp=base.CreateParams;cp.ExStyle|=0x08000000;return cp; } }
 }
 internal static class Program {
+    public static string VersionDisplay {
+        get {
+            var attribute=(System.Reflection.AssemblyInformationalVersionAttribute)System.Attribute.GetCustomAttribute(typeof(Program).Assembly,typeof(System.Reflection.AssemblyInformationalVersionAttribute));
+            if(attribute!=null&&!String.IsNullOrWhiteSpace(attribute.InformationalVersion))return attribute.InformationalVersion;
+            Version version=typeof(Program).Assembly.GetName().Version;
+            return version==null?"v0.0.0":"v"+version.ToString();
+        }
+    }
     [STAThread] static void Main(string[] args) {
         Application.EnableVisualStyles(); Application.SetCompatibleTextRenderingDefault(false);
         string backup=null,database=null;
@@ -311,7 +319,7 @@ internal sealed class SavedSqlEntry {
     string firebirdBin = @"C:\Program Files\Firebird\Firebird_2_5\bin"; string lastDmlPreflightSummary="";
 
     public MainForm(string startupBackupFile=null,string startupDatabaseFile=null) {
-        Text="Consulta SQL Firebird - v0.1.26";Icon=System.Drawing.Icon.ExtractAssociatedIcon(Application.ExecutablePath);BackColor=Color.FromArgb(226,229,232);Width=1180;Height=820;MinimumSize=new Size(900,600);StartPosition=FormStartPosition.CenterScreen;tips=new ToolTip{AutoPopDelay=12000,InitialDelay=500,ReshowDelay=200,ShowAlways=true};
+        Text="Consulta SQL Firebird - "+Program.VersionDisplay;Icon=System.Drawing.Icon.ExtractAssociatedIcon(Application.ExecutablePath);BackColor=Color.FromArgb(226,229,232);Width=1180;Height=820;MinimumSize=new Size(900,600);StartPosition=FormStartPosition.CenterScreen;tips=new ToolTip{AutoPopDelay=12000,InitialDelay=500,ReshowDelay=200,ShowAlways=true};
         var outer=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=2,Padding=new Padding(2),BackColor=Color.FromArgb(226,229,232)};outer.RowStyles.Add(new RowStyle(SizeType.AutoSize));outer.RowStyles.Add(new RowStyle(SizeType.Percent,100));Controls.Add(outer);
         var menu=new MenuStrip{BackColor=Color.FromArgb(226,229,232),ForeColor=Color.FromArgb(35,41,48)};var fileMenu=new ToolStripMenuItem("Arquivo");var openItem=new ToolStripMenuItem("Abrir script SQL...");openItem.ShortcutKeys=Keys.Control|Keys.O;openItem.Click+=(s,e)=>OpenSqlScript();fileMenu.DropDownItems.Add(openItem);var saveItem=new ToolStripMenuItem("Salvar script SQL...");saveItem.ShortcutKeys=Keys.Control|Keys.S;saveItem.Click+=(s,e)=>SaveSqlScript();fileMenu.DropDownItems.Add(saveItem);var runFileItem=new ToolStripMenuItem("Executar arquivo SQL ou TXT...");runFileItem.Click+=(s,e)=>RunSqlFile();fileMenu.DropDownItems.Add(runFileItem);fileMenu.DropDownItems.Add(new ToolStripSeparator());var exitItem=new ToolStripMenuItem("Sair");exitItem.Click+=(s,e)=>Close();fileMenu.DropDownItems.Add(exitItem);menu.Items.Add(fileMenu);
         var dbMenu=new ToolStripMenuItem("Banco");var connectItem=new ToolStripMenuItem("Conectar / testar conexão");connectItem.Click+=(s,e)=>ToggleConnection();dbMenu.DropDownItems.Add(connectItem);var chooseItem=new ToolStripMenuItem("Selecionar arquivo do banco...");chooseItem.Click+=(s,e)=>ChooseDatabase();dbMenu.DropDownItems.Add(chooseItem);var recentItem=new ToolStripMenuItem("Bancos usados recentemente");recentItem.Click+=(s,e)=>ShowRecentDatabases();dbMenu.DropDownItems.Add(recentItem);dbMenu.DropDownItems.Add(new ToolStripSeparator());var tableItem=new ToolStripMenuItem("Listar tabelas");tableItem.Click+=(s,e)=>ShowTableList();dbMenu.DropDownItems.Add(tableItem);var searchObjectsItem=new ToolStripMenuItem("Pesquisar tabelas e campos...");searchObjectsItem.Click+=(s,e)=>ShowDatabaseNameSearch();dbMenu.DropDownItems.Add(searchObjectsItem);var objectsItem=new ToolStripMenuItem("Views, procedures e generators...");objectsItem.Click+=(s,e)=>ShowDatabaseObjects();dbMenu.DropDownItems.Add(objectsItem);var infoItem=new ToolStripMenuItem("Informações do banco");infoItem.Click+=(s,e)=>ShowDatabaseInfo();dbMenu.DropDownItems.Add(infoItem);var monitorItem=new ToolStripMenuItem("Monitoramento do banco...");monitorItem.Click+=(s,e)=>OpenDatabaseMonitor();dbMenu.DropDownItems.Add(monitorItem);dbMenu.DropDownItems.Add(new ToolStripSeparator());var backupItem=new ToolStripMenuItem("Fazer backup...");backupItem.Click+=(s,e)=>BackupDatabase();dbMenu.DropDownItems.Add(backupItem);var restoreItem=new ToolStripMenuItem("Restaurar backup...");restoreItem.Click+=(s,e)=>RestoreDatabase();dbMenu.DropDownItems.Add(restoreItem);menu.Items.Add(dbMenu);
@@ -333,7 +341,7 @@ internal sealed class SavedSqlEntry {
         try { update=await Task.Run(delegate{return ConsultaSQLUpdater.CheckForUpdate();}); }
         catch(Exception ex) { ConsultaSQLUpdater.LastDiagnostic="Não foi possível verificar a atualização. Detalhe: "+ex.GetType().Name+": "+ex.Message; }
         if(IsDisposed)return;
-        if(update==null){string diagnostic=ConsultaSQLUpdater.LastDiagnostic;if(String.IsNullOrWhiteSpace(diagnostic))return;bool current=diagnostic.StartsWith("O programa já está atualizado",StringComparison.OrdinalIgnoreCase);status.Text=current?"Atualização: "+diagnostic:"Atualização não verificada. Passe o mouse sobre esta mensagem para ver o motivo.";status.ForeColor=current?Color.DarkGreen:Color.DarkGoldenrod;if(tips!=null)tips.SetToolTip(status,diagnostic);return;}
+        if(update==null)return;
         status.Text="Nova versão "+update.Tag+" encontrada. Atualizando e reiniciando o programa...";status.ForeColor=Color.DarkGreen;if(tips!=null)tips.SetToolTip(status,"O executável será baixado e o programa será reiniciado.");
         await Task.Delay(1500);if(IsDisposed)return;
         try { string[] command=Environment.GetCommandLineArgs();string[] restartArgs=new string[Math.Max(0,command.Length-1)];if(command.Length>1)Array.Copy(command,1,restartArgs,0,command.Length-1);ConsultaSQLUpdater.Start(update,Process.GetCurrentProcess().Id,restartArgs);SaveLastSession();Application.Exit(); }
@@ -450,7 +458,7 @@ internal sealed class SavedSqlEntry {
             if(!sql.TrimEnd().EndsWith(";",StringComparison.Ordinal))sql=sql.TrimEnd()+";";
         }
         string output=RunIsql(sql);if(HasSqlError(output))return output;return null;
-    }    void ShowAbout() { MessageBox.Show(this,"Consulta SQL Firebird\r\nVersão v0.1.26\r\n\r\nDesenvolvido por Thiago Endrigo.\r\nendrigo.araujosa@gmail.com\r\n\r\nAplicativo para consultar e analisar dados em bancos Firebird, executar scripts SQL e facilitar a manutenção de registros.","Sobre o aplicativo",MessageBoxButtons.OK,MessageBoxIcon.Information); }
+    }    void ShowAbout() { MessageBox.Show(this,"Consulta SQL Firebird\r\nVersão "+Program.VersionDisplay+"\r\n\r\nDesenvolvido por Thiago Endrigo.\r\nendrigo.araujosa@gmail.com\r\n\r\nAplicativo para consultar e analisar dados em bancos Firebird, executar scripts SQL e facilitar a manutenção de registros.","Sobre o aplicativo",MessageBoxButtons.OK,MessageBoxIcon.Information); }
     void ShowShortcuts() { MessageBox.Show(this,"ATALHOS DO EDITOR SQL\r\nF1 — Listar tabelas\r\nF3 — Localizar\r\nF4 / F8 — Próxima ocorrência\r\nF5 — Alternar maiúsculas e minúsculas\r\nF6 — Editar a grade\r\nF9 ou Ctrl+Enter — Executar SQL\r\nCtrl+Alt+F — Formatar SQL\r\nCtrl+Alt+L — Formatar seleção\r\nCtrl+Alt+R — Substituir texto\r\nCtrl+D — Duplicar linha\r\nCtrl+Z — SQL anterior do histórico da sessão\r\nCtrl+Shift+Z — SQL seguinte no histórico\r\nCtrl+Setas — Mover linha\r\n\r\nNO EDITOR SQL\r\nBotão direito — Executar SQL ou abrir e executar um arquivo\r\n\r\nNA GRADE\r\nF11 — Filtro global\r\nEnter — Confirmar valor editado\r\nBotão direito — Copiar, gerar INSERT/UPDATE e filtrar\r\n\r\nUse Consulta > Histórico SQL desta sessão para localizar e reutilizar comandos executados.\r\nUse Arquivo para abrir, salvar ou executar scripts SQL/TXT.","Atalhos e ajuda",MessageBoxButtons.OK,MessageBoxIcon.Information); }
     void ShowDatabaseInfo() { if(!Ready())return;try{string raw=RunIsql("SELECT CURRENT_USER AS USUARIO, CURRENT_TIMESTAMP AS DATA_HORA FROM RDB$DATABASE;");if(HasSqlError(raw)){ShowExecutionError("Não foi possível consultar o banco",raw,"Confira o caminho, a senha e a conexão com o banco.");return;}string size=File.Exists(dbBox.Text)?(new FileInfo(dbBox.Text).Length/1024/1024).ToString()+" MB":"Não disponível";MessageBox.Show(this,"Arquivo do banco: "+dbBox.Text+"\r\nUsuário conectado: SYSDBA\r\nTamanho do arquivo: "+size+"\r\n\r\n"+raw,"Informações do banco",MessageBoxButtons.OK,MessageBoxIcon.Information);}catch(Exception ex){ShowExecutionError("Não foi possível consultar o banco",ex.ToString(),"Confira o caminho, a senha e a conexão com o banco.");} }
     void AttachSqlEditorContextMenu() {
@@ -1201,7 +1209,7 @@ internal sealed class SavedSqlEntry {
     DataColumn FindColumn(DataTable table,string name) { if(table==null||String.IsNullOrEmpty(name))return null;foreach(DataColumn c in table.Columns)if(String.Equals(c.ColumnName.Trim(),name.Trim(),StringComparison.OrdinalIgnoreCase))return c;return null; }
     void SaveEdits() {
         if(activeState==null||!activeState.Editing)return;
-        var saveDiagnostics=new StringBuilder();saveDiagnostics.AppendLine("CONTEXTO DA TENTATIVA DE SALVAMENTO");saveDiagnostics.AppendLine("Data/hora: "+DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));saveDiagnostics.AppendLine("Versão: v0.1.26");saveDiagnostics.AppendLine("Banco: "+dbBox.Text.Trim());saveDiagnostics.AppendLine("Tabela: "+activeState.TableName);saveDiagnostics.AppendLine("Consulta que gerou os dados: "+activeState.Sql);saveDiagnostics.AppendLine("Identificação da linha: "+(activeState.UseDbKeyIdentity?"RDB$DB_KEY (CHAR(8) OCTETS)":activeState.UseOriginalValuesAsIdentity?"valores originais":"chave primária/índice único ("+String.Join(", ",activeState.PrimaryKey.ToArray())+")"));
+        var saveDiagnostics=new StringBuilder();saveDiagnostics.AppendLine("CONTEXTO DA TENTATIVA DE SALVAMENTO");saveDiagnostics.AppendLine("Data/hora: "+DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));saveDiagnostics.AppendLine("Versão: "+Program.VersionDisplay);saveDiagnostics.AppendLine("Banco: "+dbBox.Text.Trim());saveDiagnostics.AppendLine("Tabela: "+activeState.TableName);saveDiagnostics.AppendLine("Consulta que gerou os dados: "+activeState.Sql);saveDiagnostics.AppendLine("Identificação da linha: "+(activeState.UseDbKeyIdentity?"RDB$DB_KEY (CHAR(8) OCTETS)":activeState.UseOriginalValuesAsIdentity?"valores originais":"chave primária/índice único ("+String.Join(", ",activeState.PrimaryKey.ToArray())+")"));
         try {
             CloseInlineCellEditor(true);activeState.Grid.EndEdit();DataTable source=activeState.Table;DataTable changes=source.GetChanges(DataRowState.Modified);
             if(changes==null||changes.Rows.Count==0){status.Text="Nenhuma célula foi alterada.";status.ForeColor=Color.DimGray;return;}
