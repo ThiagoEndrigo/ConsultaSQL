@@ -81,31 +81,43 @@ $argLine = [string]::Join(' ', $quoted)
 $workDir = Split-Path -Parent $target
 $scriptPath = $MyInvocation.MyCommand.Path
 $backup = $target + '.previous'
+$staged = $target + '.update'
 $installed = $false
+$lastInstallError = 'Nenhum detalhe adicional foi informado pelo Windows.'
 $newProcess = $null
 try {
     $oldProcess = Get-Process -Id $ProcessId -ErrorAction SilentlyContinue
     if ($null -ne $oldProcess) {
         $oldProcess.WaitForExit(120000)
         $oldProcess.Refresh()
-        if (-not $oldProcess.HasExited) { throw 'O programa anterior ainda está em execução.' }
+        if (-not $oldProcess.HasExited) { throw 'O programa anterior ainda está em execução. Feche-o e tente novamente.' }
     }
+    Start-Sleep -Milliseconds 1000
 
     if (-not (Test-Path -LiteralPath $target)) { throw 'O executável instalado não foi encontrado.' }
     if (Test-Path -LiteralPath $backup) { Remove-Item -LiteralPath $backup -Force }
-    Copy-Item -LiteralPath $target -Destination $backup -Force
-    if (-not (Test-Path -LiteralPath $backup)) { throw 'Não foi possível criar uma cópia de segurança da versão atual.' }
+    if (Test-Path -LiteralPath $staged) { Remove-Item -LiteralPath $staged -Force }
+    Copy-Item -LiteralPath $download -Destination $staged -Force
+    $sourceHash = (Get-FileHash -LiteralPath $download -Algorithm SHA256).Hash
+    $stagedHash = (Get-FileHash -LiteralPath $staged -Algorithm SHA256).Hash
+    if ($sourceHash -ne $stagedHash) { throw 'A cópia temporária da atualização não corresponde ao arquivo baixado.' }
 
     for ($i=0; $i -lt 30; $i++) {
         try {
-            Copy-Item -LiteralPath $download -Destination $target -Force
-            $sourceHash = (Get-FileHash -LiteralPath $download -Algorithm SHA256).Hash
+            if (Test-Path -LiteralPath $target) { Move-Item -LiteralPath $target -Destination $backup -Force }
+            Move-Item -LiteralPath $staged -Destination $target -Force
             $targetHash = (Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash
             if ($sourceHash -eq $targetHash) { $installed = $true; break }
-        } catch { }
+            throw 'O arquivo instalado não corresponde ao arquivo baixado.'
+        } catch {
+            $lastInstallError = $_.Exception.Message
+            if (-not (Test-Path -LiteralPath $target) -and (Test-Path -LiteralPath $backup)) {
+                try { Move-Item -LiteralPath $backup -Destination $target -Force } catch { $lastInstallError += ' A restauração temporária também falhou: ' + $_.Exception.Message }
+            }
+        }
         Start-Sleep -Milliseconds 500
     }
-    if (-not $installed) { throw 'O Windows não permitiu substituir o executável.' }
+    if (-not $installed) { throw ('O Windows não permitiu substituir o executável. Detalhe do sistema: {0}' -f $lastInstallError) }
 
     if ($argLine.Length -gt 0) { $newProcess = Start-Process -FilePath $target -ArgumentList $argLine -WorkingDirectory $workDir -PassThru }
     else { $newProcess = Start-Process -FilePath $target -WorkingDirectory $workDir -PassThru }
@@ -122,11 +134,21 @@ try {
     }
 } catch {
     $message = $_.Exception.Message
+    if ($message -match '(?i)access.*denied|acesso negado|unauthorizedaccess') { $message = ('Sem permissão para gravar na pasta do programa. Instale-o em uma pasta do usuário ou execute-o com permissão de administrador. Detalhe: {0}' -f $message) }
+    elseif ($message -match '(?i)being used by another process|used by another process|em uso por outro processo|sharing violation') { $message = ('Outro processo ainda está usando o executável. Feche as outras instâncias e tente novamente. Detalhe: {0}' -f $message) }
     if ($newProcess -ne $null) {
-        try { $newProcess.Refresh(); if (-not $newProcess.HasExited) { Stop-Process -Id $newProcess.Id -Force } } catch { }
+        try { $newProcess.Refresh(); if (-not $newProcess.HasExited) { Stop-Process -Id $newProcess.Id -Force }; $newProcess.WaitForExit(15000) } catch { }
     }
     if (Test-Path -LiteralPath $backup) {
-        try { Copy-Item -LiteralPath $backup -Destination $target -Force } catch { }
+        try {
+            $failedTarget = $target + '.failed'
+            if (Test-Path -LiteralPath $failedTarget) { Remove-Item -LiteralPath $failedTarget -Force }
+            if (Test-Path -LiteralPath $target) { Move-Item -LiteralPath $target -Destination $failedTarget -Force }
+            Move-Item -LiteralPath $backup -Destination $target -Force
+            if (Test-Path -LiteralPath $failedTarget) { Remove-Item -LiteralPath $failedTarget -Force }
+        } catch {
+            try { Copy-Item -LiteralPath $backup -Destination $target -Force } catch { $message += ' A restauração automática falhou: ' + $_.Exception.Message }
+        }
     }
     try {
         Add-Type -AssemblyName System.Windows.Forms
@@ -139,6 +161,7 @@ try {
         } catch { }
     }
 } finally {
+    try { if (Test-Path -LiteralPath $staged) { Remove-Item -LiteralPath $staged -Force -ErrorAction SilentlyContinue } } catch { }
     try { if (Test-Path -LiteralPath $download) { Remove-Item -LiteralPath $download -Force -ErrorAction SilentlyContinue } } catch { }
     try { if (Test-Path -LiteralPath $scriptPath) { Remove-Item -LiteralPath $scriptPath -Force -ErrorAction SilentlyContinue } } catch { }
 }";
