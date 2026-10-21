@@ -1,4 +1,4 @@
-﻿# Consulta SQL Firebird
+# Consulta SQL Firebird
 
 Aplicativo Windows para consultar e analisar dados em bancos Firebird, executar scripts SQL e facilitar a manutenção de registros.
 
@@ -8,9 +8,11 @@ Ao iniciar, o aplicativo consulta a última versão publicada em [Releases](http
 
 ## Publicação de uma versão
 
+**Autorização obrigatória:** nenhuma alteração, tag ou executável será enviado ao GitHub sem autorização explícita do usuário para aquela publicação. Autorizações anteriores não se aplicam a versões futuras. O código pode ser preparado, compilado e commitado localmente enquanto se aguarda essa autorização.
+
 1. Atualize a versão nos atributos do assembly e nos textos de versão de `ConsultaSQL.cs`.
-2. Faça commit das alterações.
-3. Crie e envie uma tag no formato `vMAJOR.MINOR.PATCH`, como `v0.0.40`.
+2. Compile localmente e confira a versão gerada.
+3. **Somente depois da autorização explícita do usuário**, envie o código e a tag `vMAJOR.MINOR.PATCH` ao GitHub.
 4. O GitHub Actions compila o programa e publica `ConsultaSQL.exe` na Release. Esse nome é usado pelo atualizador.
 
 O fluxo de publicação confirma que a versão do código corresponde à tag antes de criar a Release.
