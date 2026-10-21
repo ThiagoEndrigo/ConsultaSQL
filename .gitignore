@@ -1,4 +1,4 @@
-﻿# Dados de bancos e arquivos gerados
+# Dados de bancos e arquivos gerados
 *.FDB
 *.GDB
 *.FBK
@@ -11,3 +11,6 @@
 # Executáveis e cópias locais
 *.exe
 *.bak
+
+# Senha local do Firebird (não versionar)
+consultasqlpass.ini
