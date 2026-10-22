@@ -106,22 +106,44 @@ try {
     if (-not (Test-Path -LiteralPath $target)) { throw 'O executável instalado não foi encontrado.' }
     if (Test-Path -LiteralPath $backup) { Remove-Item -LiteralPath $backup -Force }
     if (Test-Path -LiteralPath $staged) { Remove-Item -LiteralPath $staged -Force }
-    Copy-Item -LiteralPath $download -Destination $staged -Force
     $sourceHash = (Get-FileHash -LiteralPath $download -Algorithm SHA256).Hash
-    $stagedHash = (Get-FileHash -LiteralPath $staged -Algorithm SHA256).Hash
-    if ($sourceHash -ne $stagedHash) { throw 'A cópia temporária da atualização não corresponde ao arquivo baixado.' }
-
+    $backupReady = $false
     for ($i=0; $i -lt 30; $i++) {
         try {
-            if (Test-Path -LiteralPath $target) { Move-Item -LiteralPath $target -Destination $backup -Force }
+            if (Test-Path -LiteralPath $staged) { Remove-Item -LiteralPath $staged -Force }
+            Copy-Item -LiteralPath $download -Destination $staged -Force
+            $stagedHash = (Get-FileHash -LiteralPath $staged -Algorithm SHA256).Hash
+            if ($sourceHash -ne $stagedHash) { throw 'A cópia temporária da atualização não corresponde ao arquivo baixado.' }
+
+            if (Test-Path -LiteralPath $target) {
+                $existingHash = (Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash
+                if ($existingHash -eq $sourceHash) { $installed = $true; break }
+                if (-not $backupReady) {
+                    if (Test-Path -LiteralPath $backup) { throw 'Já existe uma cópia anterior que não pôde ser removida.' }
+                    Move-Item -LiteralPath $target -Destination $backup -Force
+                    $backupReady = $true
+                } else {
+                    Remove-Item -LiteralPath $target -Force
+                }
+            } elseif (-not $backupReady -and -not (Test-Path -LiteralPath $backup)) {
+                throw 'O executável instalado não foi encontrado e não há cópia para restauração.'
+            }
+
             Move-Item -LiteralPath $staged -Destination $target -Force
             $targetHash = (Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash
-            if ($sourceHash -eq $targetHash) { $installed = $true; break }
-            throw 'O arquivo instalado não corresponde ao arquivo baixado.'
+            if ($sourceHash -ne $targetHash) { throw 'O arquivo instalado não corresponde ao arquivo baixado.' }
+            $installed = $true
+            break
         } catch {
             $lastInstallError = $_.Exception.Message
-            if (-not (Test-Path -LiteralPath $target) -and (Test-Path -LiteralPath $backup)) {
-                try { Move-Item -LiteralPath $backup -Destination $target -Force } catch { $lastInstallError += ' A restauração temporária também falhou: ' + $_.Exception.Message }
+            if (Test-Path -LiteralPath $backup) {
+                try {
+                    if (Test-Path -LiteralPath $target) {
+                        $currentTargetHash = (Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash
+                        if ($currentTargetHash -ne $sourceHash) { Remove-Item -LiteralPath $target -Force }
+                    }
+                    if (-not (Test-Path -LiteralPath $target)) { Copy-Item -LiteralPath $backup -Destination $target -Force }
+                } catch { $lastInstallError += ' A cópia de segurança foi preservada, mas a restauração temporária falhou: ' + $_.Exception.Message }
             }
         }
         Start-Sleep -Milliseconds 500
