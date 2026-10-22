@@ -13,9 +13,9 @@ using System.Windows.Forms;
 
 [assembly: System.Reflection.AssemblyTitle("Consulta SQL Firebird")]
 [assembly: System.Reflection.AssemblyProduct("Consulta SQL Firebird")]
-[assembly: System.Reflection.AssemblyVersion("0.1.30.0")]
-[assembly: System.Reflection.AssemblyFileVersion("0.1.30.0")]
-[assembly: System.Reflection.AssemblyInformationalVersion("v0.1.30")]
+[assembly: System.Reflection.AssemblyVersion("0.1.31.0")]
+[assembly: System.Reflection.AssemblyFileVersion("0.1.31.0")]
+[assembly: System.Reflection.AssemblyInformationalVersion("v0.1.31")]
 
 internal static class FirebirdOutputText {
     public static readonly Encoding Encoding = System.Text.Encoding.GetEncoding(65001, EncoderFallback.ReplacementFallback, new Windows1252DecoderFallback());
@@ -956,7 +956,7 @@ internal sealed class SavedSqlEntry {
     }
     string GetSingleTableSourceName(string sql) {
         string text=sql??"";if(Regex.IsMatch(text,@"\b(JOIN|UNION)\b",RegexOptions.IgnoreCase))return "";
-        Match m=Regex.Match(text,@"\bFROM\s+(?""(?<quoted>[^""]+)""|(?<plain>[A-Za-z][A-Za-z0-9_$]*))(?=\s|;|$)",RegexOptions.IgnoreCase);
+        Match m=Regex.Match(text,@"\bFROM\s+(?:""(?<quoted>[^""]+)""|(?<plain>[A-Za-z][A-Za-z0-9_$]*))(?=\s|;|$)",RegexOptions.IgnoreCase);
         if(!m.Success)return "";return m.Groups["quoted"].Success?m.Groups["quoted"].Value:m.Groups["plain"].Value.ToUpperInvariant();
     }
     string SqlTextLiteral(string value) { if(value==null||String.Equals(value,"<null>",StringComparison.OrdinalIgnoreCase))return "NULL";return "'"+value.Replace("'","''")+"'"; }
