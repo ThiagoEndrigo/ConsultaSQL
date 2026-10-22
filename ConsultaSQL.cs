@@ -6,6 +6,7 @@ using System.Drawing;
 using System.IO;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Web.Script.Serialization;
@@ -13,9 +14,9 @@ using System.Windows.Forms;
 
 [assembly: System.Reflection.AssemblyTitle("Consulta SQL Firebird")]
 [assembly: System.Reflection.AssemblyProduct("Consulta SQL Firebird")]
-[assembly: System.Reflection.AssemblyVersion("0.1.31.0")]
-[assembly: System.Reflection.AssemblyFileVersion("0.1.31.0")]
-[assembly: System.Reflection.AssemblyInformationalVersion("v0.1.31")]
+[assembly: System.Reflection.AssemblyVersion("0.1.32.0")]
+[assembly: System.Reflection.AssemblyFileVersion("0.1.32.0")]
+[assembly: System.Reflection.AssemblyInformationalVersion("v0.1.32")]
 
 internal static class FirebirdOutputText {
     public static readonly Encoding Encoding = System.Text.Encoding.GetEncoding(65001, EncoderFallback.ReplacementFallback, new Windows1252DecoderFallback());
@@ -62,13 +63,22 @@ internal static class Program {
         form.Shown += delegate { CleanupPreviousExecutable(); };
         Application.Run(form);
     }
+    [DllImport("kernel32.dll",CharSet=CharSet.Unicode,SetLastError=true)]
+    static extern bool MoveFileEx(string existingFileName,string newFileName,int flags);
     static void CleanupPreviousExecutable() {
         Task.Run(delegate {
             string previous=Process.GetCurrentProcess().MainModule.FileName+".previous";
-            for(int attempt=0;attempt<40;attempt++) {
-                try { if(File.Exists(previous))File.Delete(previous); if(!File.Exists(previous))return; } catch {}
-                System.Threading.Thread.Sleep(500);
+            for(int attempt=0;attempt<120;attempt++) {
+                try {
+                    if(!File.Exists(previous))return;
+                    FileAttributes attributes=File.GetAttributes(previous);
+                    if((attributes&FileAttributes.ReadOnly)!=0)File.SetAttributes(previous,attributes&~FileAttributes.ReadOnly);
+                    File.Delete(previous);
+                    if(!File.Exists(previous))return;
+                } catch {}
+                System.Threading.Thread.Sleep(1000);
             }
+            try { if(File.Exists(previous))MoveFileEx(previous,null,4); } catch {}
         });
     }
 }
