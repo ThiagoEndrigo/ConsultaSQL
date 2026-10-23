@@ -14,9 +14,9 @@ using System.Windows.Forms;
 
 [assembly: System.Reflection.AssemblyTitle("Consulta SQL Firebird")]
 [assembly: System.Reflection.AssemblyProduct("Consulta SQL Firebird")]
-[assembly: System.Reflection.AssemblyVersion("0.1.55.0")]
-[assembly: System.Reflection.AssemblyFileVersion("0.1.55.0")]
-[assembly: System.Reflection.AssemblyInformationalVersion("v0.1.55")]
+[assembly: System.Reflection.AssemblyVersion("0.0.0.1")]
+[assembly: System.Reflection.AssemblyFileVersion("0.0.0.1")]
+[assembly: System.Reflection.AssemblyInformationalVersion("v0.0.0.1")]
 
 internal static class FirebirdOutputText {
     public static readonly Encoding Encoding = System.Text.Encoding.GetEncoding(65001, EncoderFallback.ReplacementFallback, new Windows1252DecoderFallback());
@@ -1020,7 +1020,7 @@ internal sealed class SavedSqlEntry {
     void HighlightSqlSyntax() {
         if(sqlBox==null||sqlBox.IsDisposed||IsDisposed||sqlBox.TextLength==0)return;
         if(sqlBox.TextLength>40000||sqlBox.Lines.Length>100)return;
-        string text=sqlBox.Text;int selectionStart=sqlBox.SelectionStart,selectionLength=sqlBox.SelectionLength,firstVisible=0;
+        string text=sqlBox.Text;int selectionStart=sqlBox.SelectionStart,selectionLength=sqlBox.SelectionLength,firstVisible=0;if(selectionLength>0)return;
         try{firstVisible=SendEditorMessage(sqlBox.Handle,0x00CE,IntPtr.Zero,IntPtr.Zero).ToInt32();}catch{}
         string pattern=@"--[^\r\n]*|/\*[\s\S]*?\*/|'(?:''|[^'])*'|""(?:""""|[^""])*""|:[A-Za-z_][A-Za-z0-9_$]*|\b(?:SELECT|DISTINCT|FROM|WHERE|AND|OR|NOT|IN|EXISTS|BETWEEN|LIKE|IS|NULL|AS|ON|JOIN|INNER|LEFT|RIGHT|FULL|OUTER|CROSS|GROUP|BY|HAVING|ORDER|ASC|DESC|FIRST|SKIP|ROWS|OFFSET|UNION|CASE|WHEN|THEN|ELSE|END|WITH|RECURSIVE|INSERT|INTO|VALUES|UPDATE|SET|DELETE|MERGE|RETURNING|CREATE|ALTER|DROP|TABLE|VIEW|INDEX|TRIGGER|PROCEDURE|EXECUTE|COMMIT|ROLLBACK|PRIMARY|KEY|FOREIGN|REFERENCES|UNIQUE|CHECK|DEFAULT|CONSTRAINT|CAST|COALESCE|NULLIF|COUNT|SUM|AVG|MIN|MAX|UPPER|LOWER|SUBSTRING|TRIM|CURRENT_DATE|CURRENT_TIME|CURRENT_TIMESTAMP|CURRENT_USER|GEN_ID|EXTRACT|DATEADD|DATEDIFF|CONTAINING|STARTING|SIMILAR|PLAN|DECLARE|SUSPEND|COLLATE)\b|\b\d+(?:[.,]\d+)?\b";
         MatchCollection tokens=Regex.Matches(text,pattern,RegexOptions.IgnoreCase);

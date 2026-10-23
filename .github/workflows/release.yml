@@ -21,7 +21,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $tag = $env:GITHUB_REF_NAME
-          $match = [regex]::Match($tag, '^v(?<version>\d+\.\d+\.\d+)$')
+          $match = [regex]::Match($tag, '^v(?<version>\d+\.\d+\.\d+(?:\.\d+)?)$')
           if (-not $match.Success) { throw "Tag inválida: $tag" }
           $expectedVersion = "v$($match.Groups['version'].Value)"
           $source = Get-Content -Raw -LiteralPath 'ConsultaSQL.cs'

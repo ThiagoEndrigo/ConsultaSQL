@@ -12,7 +12,7 @@ Ao iniciar, o aplicativo consulta a última versão publicada em [Releases](http
 
 1. Atualize a versão nos atributos do assembly e nos textos de versão de `ConsultaSQL.cs`.
 2. Compile localmente e confira a versão gerada.
-3. **Somente depois da autorização explícita do usuário**, envie o código e a tag `vMAJOR.MINOR.PATCH` ao GitHub.
+3. **Somente depois da autorização explícita do usuário**, envie o código e a tag `vMAJOR.MINOR.PATCH` ou `vMAJOR.MINOR.PATCH.REVISION` ao GitHub.
 4. O GitHub Actions compila o programa e publica `ConsultaSQL.exe` na Release. Esse nome é usado pelo atualizador.
 
 O fluxo de publicação confirma que a versão do código corresponde à tag antes de criar a Release.
