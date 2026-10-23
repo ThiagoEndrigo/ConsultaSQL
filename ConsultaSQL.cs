@@ -14,9 +14,9 @@ using System.Windows.Forms;
 
 [assembly: System.Reflection.AssemblyTitle("Consulta SQL Firebird")]
 [assembly: System.Reflection.AssemblyProduct("Consulta SQL Firebird")]
-[assembly: System.Reflection.AssemblyVersion("0.1.51.0")]
-[assembly: System.Reflection.AssemblyFileVersion("0.1.51.0")]
-[assembly: System.Reflection.AssemblyInformationalVersion("v0.1.51")]
+[assembly: System.Reflection.AssemblyVersion("0.1.55.0")]
+[assembly: System.Reflection.AssemblyFileVersion("0.1.55.0")]
+[assembly: System.Reflection.AssemblyInformationalVersion("v0.1.55")]
 
 internal static class FirebirdOutputText {
     public static readonly Encoding Encoding = System.Text.Encoding.GetEncoding(65001, EncoderFallback.ReplacementFallback, new Windows1252DecoderFallback());
@@ -103,7 +103,18 @@ internal sealed class BackupPasswordForm : Form {
 
 internal sealed class FieldSchemaInfo { public int Type,Scale,SubType; public string CharacterSet=""; }
 internal sealed class GridColumnChoice { public DataGridViewColumn Column; public override string ToString() { string header=String.IsNullOrWhiteSpace(Column.HeaderText)?Column.Name:Column.HeaderText;return String.Equals(header,Column.Name,StringComparison.OrdinalIgnoreCase)?header:header+" ("+Column.Name+")"; } }internal sealed class QueryResultState { public string Sql="",TableName="",DbKeyColumn=""; public DataTable Table; public DataGridView Grid; public List<string> PrimaryKey=new List<string>(); public List<string> ReadOnlyColumns=new List<string>(); public Dictionary<string,int> FieldTypes=new Dictionary<string,int>(StringComparer.OrdinalIgnoreCase); public Dictionary<string,int> FieldScales=new Dictionary<string,int>(StringComparer.OrdinalIgnoreCase); public Dictionary<string,int> FieldSubTypes=new Dictionary<string,int>(StringComparer.OrdinalIgnoreCase); public Dictionary<string,string> FieldCharacterSets=new Dictionary<string,string>(StringComparer.OrdinalIgnoreCase); public bool CanEdit=false, Editing=false, MetadataLoaded=false, UseOriginalValuesAsIdentity=false, UseDbKeyIdentity=false; public int SearchHighlightColumn=-1; public string QuickFilterText=""; public TextBox QuickFilterInput; public Label QuickFilterCount; public System.Windows.Forms.Timer QuickFilterTimer; public Panel QuickFilterBar; public TableLayoutPanel QuickFilterLayout; }
-internal sealed class BlobViewerForm : Form {
+internal sealed class ResultGridDivider : Panel {
+    public TableLayoutPanel UpperCard,LowerCard;
+    bool dragging=false,hovered=false;int startY,upperStart,lowerStart;
+    public ResultGridDivider() { Cursor=Cursors.HSplit;BackColor=Color.FromArgb(192,198,204);SetStyle(ControlStyles.UserPaint|ControlStyles.AllPaintingInWmPaint|ControlStyles.OptimizedDoubleBuffer,true);AccessibleRole=AccessibleRole.SplitButton; }
+    protected override void OnPaint(PaintEventArgs e) { base.OnPaint(e);Color line=hovered||dragging?Color.FromArgb(45,115,180):Color.FromArgb(120,130,140);using(var pen=new Pen(line,hovered||dragging?2:1)){int x=Width/2;for(int offset=-9;offset<=9;offset+=6)e.Graphics.DrawLine(pen,x+offset,Height/2-1,x+offset+3,Height/2-1);e.Graphics.DrawLine(pen,4,0,Width-5,0);e.Graphics.DrawLine(pen,4,Height-1,Width-5,Height-1);} }
+    protected override void OnMouseEnter(EventArgs e) { base.OnMouseEnter(e);hovered=true;Invalidate(); }
+    protected override void OnMouseLeave(EventArgs e) { base.OnMouseLeave(e);if(!dragging){hovered=false;Invalidate();} }
+    protected override void OnMouseDown(MouseEventArgs e) { base.OnMouseDown(e);if(e.Button!=MouseButtons.Left||UpperCard==null||LowerCard==null)return;Point screen=PointToScreen(e.Location);startY=screen.Y;upperStart=UpperCard.Height;lowerStart=LowerCard.Height;dragging=true;Capture=true;Invalidate(); }
+    protected override void OnMouseMove(MouseEventArgs e) { base.OnMouseMove(e);if(!dragging||!Capture)return;Point screen=PointToScreen(e.Location);int delta=screen.Y-startY;delta=Math.Max(120-upperStart,Math.Min(lowerStart-120,delta));UpperCard.Height=upperStart+delta;LowerCard.Height=lowerStart-delta; }
+    protected override void OnMouseUp(MouseEventArgs e) { base.OnMouseUp(e);if(e.Button==MouseButtons.Left){dragging=false;Capture=false;Invalidate();} }
+    protected override void OnMouseDoubleClick(MouseEventArgs e) { base.OnMouseDoubleClick(e);if(e.Button!=MouseButtons.Left||UpperCard==null||LowerCard==null)return;int total=UpperCard.Height+LowerCard.Height;int upper=Math.Max(120,Math.Min(total-120,total/2));UpperCard.Height=upper;LowerCard.Height=total-upper; }
+}internal sealed class BlobViewerForm : Form {
     readonly byte[] rawBytes; readonly string suggestedExtension;
     public BlobViewerForm(string title,string description,string content,byte[] bytes,bool isText,string extension,Image previewImage) {
         rawBytes=bytes??new byte[0];suggestedExtension=String.IsNullOrWhiteSpace(extension)?(isText?"txt":"bin"):extension;Text=title;Icon=System.Drawing.Icon.ExtractAssociatedIcon(Application.ExecutablePath);StartPosition=FormStartPosition.CenterParent;Width=850;Height=620;MinimumSize=new Size(560,360);
@@ -331,7 +342,7 @@ internal sealed class SavedSqlEntry {
     const string DbKeyLocatorColumn="CS_INTERNAL_ROW_LOCATOR_8F2A6C";
     TextBox dbBox, passBox, outputBox; RichTextBox sqlBox; System.Windows.Forms.Timer sqlAssistTimer,sqlSyntaxTimer; Label sqlVariableStatus; List<string> recentDatabases=new List<string>();
     SplitContainer mainSqlSplit; DataGridView grid; List<string> tableNames=new List<string>(); Dictionary<string,List<string>> tableFields=new Dictionary<string,List<string>>(StringComparer.OrdinalIgnoreCase); Panel tableSuggestionPopup; ListBox tableSuggestionList; bool applyingTableSuggestion=false; string lastSearch=""; static readonly string[] sqlCompletionItems=new string[]{"SELECT","DISTINCT","ALL","FROM","WHERE","AND","OR","NOT","IN","EXISTS","BETWEEN","LIKE","IS","NULL","AS","ON","JOIN","INNER","LEFT","RIGHT","FULL","OUTER","CROSS","GROUP","BY","HAVING","ORDER","ASC","DESC","FIRST","SKIP","ROWS","OFFSET","FETCH","UNION","UNION ALL","CASE","WHEN","THEN","ELSE","END","WITH","RECURSIVE","INSERT","INTO","VALUES","UPDATE","SET","DELETE","MERGE","RETURNING","CREATE","ALTER","DROP","TABLE","VIEW","INDEX","TRIGGER","PROCEDURE","EXECUTE","COMMIT","ROLLBACK","SAVEPOINT","GRANT","REVOKE","PRIMARY","KEY","FOREIGN","REFERENCES","UNIQUE","CHECK","DEFAULT","CONSTRAINT","CAST","COALESCE","NULLIF","IIF","COUNT","SUM","AVG","MIN","MAX","UPPER","LOWER","SUBSTRING","TRIM","CHAR_LENGTH","CURRENT_DATE","CURRENT_TIME","CURRENT_TIMESTAMP","CURRENT_USER","GEN_ID","LIST","EXTRACT","DATEADD","DATEDIFF","CONTAINING","STARTING","SIMILAR","PLAN","EXECUTE BLOCK","DECLARE","SUSPEND","COLLATE","CONTAINING","POSITION","ABS","ROUND","FLOOR","CEILING","POWER","MOD","REPLACE","LPAD","RPAD","ASCII_CHAR","ASCII_VAL"};
-    Label status, connectionIndicator; ToolTip tips; TabControl resultTabs, dataTabs; Panel resultHost; FlowLayoutPanel stackedResults; bool stackedResultsVisible=false; Button editButton, saveButton, cancelButton, connectButton, cancelExecutionButton; CancellationTokenSource queryCancellation; Panel scriptProgressFooter; Label scriptProgressLabel; ProgressBar scriptProgressBar; int scriptProgressCommandCount; bool autoConnectFromPasswordFile=false,connectionValidated=false, queryRunning=false; const int LargeResultWarningThreshold=10000, HighImpactDmlThreshold=1000; List<string> primaryKey=new List<string>(); List<string> readOnlyColumns=new List<string>(); string editableTable="", lastSelectSql=""; bool editMode=false; QueryResultState activeState; List<QueryResultState> queryStates=new List<QueryResultState>();
+    Label status, connectionIndicator; ToolTip tips; TabControl resultTabs, dataTabs; Panel resultHost; FlowLayoutPanel stackedResults; bool stackedResultsVisible=false,stackedHeightsInitialized=false; Button editButton, saveButton, cancelButton, connectButton, cancelExecutionButton; CancellationTokenSource queryCancellation; Panel scriptProgressFooter; Label scriptProgressLabel; ProgressBar scriptProgressBar; int scriptProgressCommandCount; bool autoConnectFromPasswordFile=false,connectionValidated=false, queryRunning=false; const int LargeResultWarningThreshold=10000, HighImpactDmlThreshold=1000; List<string> primaryKey=new List<string>(); List<string> readOnlyColumns=new List<string>(); string editableTable="", lastSelectSql=""; bool editMode=false; QueryResultState activeState; List<QueryResultState> queryStates=new List<QueryResultState>();
     DataTable resultTable = new DataTable(); TextBox cellTextSelection; DataGridView cellTextSelectionGrid; TextBox inlineCellEditor; DataGridView inlineCellEditorGrid; DataGridViewCell inlineCellEditorCell; Dictionary<string,Dictionary<string,FieldSchemaInfo>> displayFieldSchemaCache=new Dictionary<string,Dictionary<string,FieldSchemaInfo>>(StringComparer.OrdinalIgnoreCase); readonly List<string> sessionSqlHistory=new List<string>(); readonly List<string> sessionSqlDatabases=new List<string>(); int sqlHistoryPosition=-1; string sqlHistoryDraft=null;
     string firebirdBin = @"C:\Program Files\Firebird\Firebird_2_5\bin"; string lastDmlPreflightSummary="";
 
@@ -691,7 +702,24 @@ internal sealed class SavedSqlEntry {
             save.Click+=(s,e)=>{SaveCurrentSqlAsSaved();all=ReadSavedSqlEntries();entries=all.FindAll(delegate(SavedSqlEntry item){return String.Equals(item.Database,database,StringComparison.OrdinalIgnoreCase)&&!String.IsNullOrWhiteSpace(item.Name);});entries.Sort(delegate(SavedSqlEntry a,SavedSqlEntry b){return String.Compare(b.UpdatedAt,a.UpdatedAt,StringComparison.OrdinalIgnoreCase);});refresh();};
             if(entries.Count>0)list.SelectedIndex=0;form.ShowDialog(this);
         }
-    }    void GridKeyDown(object sender,KeyEventArgs e) { if(e.KeyCode==Keys.Enter&&activeState!=null&&activeState.Editing){SaveEdits();e.Handled=true;e.SuppressKeyPress=true;} }
+    }    void GridKeyDown(object sender,KeyEventArgs e) {
+        DataGridView g=sender as DataGridView;
+        if(g!=null&&(e.KeyCode==Keys.Home||e.KeyCode==Keys.End)){NavigateGridHomeEnd(g,e.KeyCode==Keys.End,e.Control);e.Handled=true;e.SuppressKeyPress=true;return;}
+        if(e.KeyCode==Keys.Enter&&activeState!=null&&activeState.Editing){SaveEdits();e.Handled=true;e.SuppressKeyPress=true;}
+    }
+    void NavigateGridHomeEnd(DataGridView g,bool toEnd,bool wholeGrid) {
+        if(g==null||g.Rows.Count==0||g.Columns.Count==0)return;
+        int rowIndex=g.CurrentCell==null?(toEnd?g.Rows.Count-1:0):g.CurrentCell.RowIndex;
+        if(wholeGrid)rowIndex=toEnd?g.Rows.Count-1:0;
+        if(rowIndex<0||rowIndex>=g.Rows.Count)return;
+        int targetColumn=-1;int targetDisplay=toEnd?Int32.MinValue:Int32.MaxValue;
+        foreach(DataGridViewColumn column in g.Columns){
+            if(!column.Visible||String.Equals(column.Name,"CS_SELECT_ROW",StringComparison.OrdinalIgnoreCase)||column.Name.StartsWith("CS_BLOB_OPEN_",StringComparison.OrdinalIgnoreCase)||column.Name.StartsWith("CS_INTERNAL_",StringComparison.OrdinalIgnoreCase))continue;
+            if((toEnd&&column.DisplayIndex>targetDisplay)||(!toEnd&&column.DisplayIndex<targetDisplay)){targetDisplay=column.DisplayIndex;targetColumn=column.Index;}
+        }
+        if(targetColumn<0)return;
+        try{g.CurrentCell=g.Rows[rowIndex].Cells[targetColumn];if(rowIndex>=0&&rowIndex<g.Rows.Count&&!g.Rows[rowIndex].Frozen)g.FirstDisplayedScrollingRowIndex=rowIndex;}catch{}
+    }
     void CenterGridCell(DataGridView g,int row,int column) {
         if(g==null||row<0||column<0||row>=g.Rows.Count||column>=g.Columns.Count)return;
         try {
@@ -1305,7 +1333,7 @@ internal sealed class SavedSqlEntry {
             }catch(Exception ex){status.Text="Não foi possível exportar esta tabela.";status.ForeColor=Color.DarkRed;MessageBox.Show(this,status.Text+"\r\n\r\n"+ex.Message,"Falha na exportação",MessageBoxButtons.OK,MessageBoxIcon.Error);}
         }
     }
-    void ClearResultPages() { foreach(QueryResultState oldState in queryStates)if(oldState.QuickFilterTimer!=null){oldState.QuickFilterTimer.Stop();oldState.QuickFilterTimer.Dispose();oldState.QuickFilterTimer=null;} if(stackedResults!=null){foreach(var oldState in queryStates)if(oldState.Grid!=null&&oldState.Grid.Parent!=null)oldState.Grid.Parent.Controls.Remove(oldState.Grid);stackedResults.Controls.Clear();stackedResults.Visible=false;}stackedResultsVisible=false;dataTabs.Visible=true;dataTabs.TabPages.Clear();queryStates.Clear();activeState=null;grid=null;resultTable=new DataTable();editMode=false;editButton.Enabled=false;editButton.Visible=false;saveButton.Enabled=false;saveButton.Visible=false;cancelButton.Enabled=false;cancelButton.Visible=false;primaryKey=new List<string>();readOnlyColumns=new List<string>();editableTable="";var waiting=new TabPage("Aguardando consulta");waiting.Controls.Add(new Label { Text="Execute uma consulta SELECT para ver os registros aqui.",Dock=DockStyle.Fill,TextAlign=ContentAlignment.MiddleCenter,ForeColor=Color.DimGray });dataTabs.TabPages.Add(waiting); }
+    void ClearResultPages() { foreach(QueryResultState oldState in queryStates)if(oldState.QuickFilterTimer!=null){oldState.QuickFilterTimer.Stop();oldState.QuickFilterTimer.Dispose();oldState.QuickFilterTimer=null;} if(stackedResults!=null){foreach(var oldState in queryStates)if(oldState.Grid!=null&&oldState.Grid.Parent!=null)oldState.Grid.Parent.Controls.Remove(oldState.Grid);stackedResults.Controls.Clear();stackedResults.Visible=false;}stackedResultsVisible=false;stackedHeightsInitialized=false;dataTabs.Visible=true;dataTabs.TabPages.Clear();queryStates.Clear();activeState=null;grid=null;resultTable=new DataTable();editMode=false;editButton.Enabled=false;editButton.Visible=false;saveButton.Enabled=false;saveButton.Visible=false;cancelButton.Enabled=false;cancelButton.Visible=false;primaryKey=new List<string>();readOnlyColumns=new List<string>();editableTable="";var waiting=new TabPage("Aguardando consulta");waiting.Controls.Add(new Label { Text="Execute uma consulta SELECT para ver os registros aqui.",Dock=DockStyle.Fill,TextAlign=ContentAlignment.MiddleCenter,ForeColor=Color.DimGray });dataTabs.TabPages.Add(waiting); }
     void AddResultPage(string sql,string raw,int number) { AddResultPage(sql,BuildResultTable(raw),number); }
     string BuildGridFilterExpression(DataTable table,string search) {
         if(table==null||String.IsNullOrWhiteSpace(search))return "";
@@ -1359,16 +1387,28 @@ internal sealed class SavedSqlEntry {
         activeState=state;grid=state.Grid;resultTable=state.Table;primaryKey=state.PrimaryKey;readOnlyColumns=state.ReadOnlyColumns;editableTable=state.TableName;lastSelectSql=state.Sql;editMode=state.Editing;
         editButton.Enabled=state.TableName.Length>0&&!state.Editing;editButton.Visible=state.TableName.Length>0&&!state.Editing;saveButton.Enabled=state.Editing;saveButton.Visible=state.Editing;cancelButton.Enabled=state.Editing;cancelButton.Visible=state.Editing;if(state.TableName.Length==0)tips.SetToolTip(editButton,"Use SELECT * FROM nome_da_tabela para habilitar a edição.");else if(!state.MetadataLoaded)tips.SetToolTip(editButton,"A edição será verificada ao clicar em Editar grade.");else if(!state.CanEdit)tips.SetToolTip(editButton,"A edição exige uma chave primária ou índice único disponível no resultado.");else if(state.UseOriginalValuesAsIdentity)tips.SetToolTip(editButton,"Sem chave única: ao salvar, o programa confere os valores originais e cancela se mais de uma linha corresponder.");else tips.SetToolTip(editButton,"Editar linhas desta tabela. Campos calculados e BLOBs ficam protegidos.");
     }
+    string StackedResultTitle(QueryResultState state,int index) {
+        string sql=Regex.Replace(state==null?"":state.Sql??"",@"\s+"," ").Trim();if(sql.Length>150)sql=sql.Substring(0,147)+"...";int rows=state==null||state.Table==null?0:state.Table.Rows.Count;return "Consulta "+index.ToString()+"   |   "+sql+"   |   "+rows.ToString("N0")+" registro(s)";
+    }
     void ShowStackedResults() {
-        if(stackedResults==null||queryStates.Count<2)return;stackedResults.SuspendLayout();stackedResults.Controls.Clear();
-        foreach(QueryResultState state in queryStates){var card=new TableLayoutPanel{ColumnCount=1,RowCount=2,Margin=new Padding(2),Padding=new Padding(0),CellBorderStyle=TableLayoutPanelCellBorderStyle.Single};card.RowStyles.Add(new RowStyle(SizeType.Absolute,22));card.RowStyles.Add(new RowStyle(SizeType.Percent,100));var title=new Label{Dock=DockStyle.Fill,AutoEllipsis=true,TextAlign=ContentAlignment.MiddleLeft,Padding=new Padding(5,0,3,0),BackColor=Color.FromArgb(218,221,224),Text=state.Sql.Trim().Replace("\r"," ").Replace("\n"," ")+"    |    "+state.Table.Rows.Count.ToString()+" registro(s)",Tag=state};title.Click+=delegate(object sender,EventArgs e){ActivateResult(state);};if(state.Grid.Parent!=null)state.Grid.Parent.Controls.Remove(state.Grid);state.Grid.Dock=DockStyle.Fill;card.Controls.Add(title,0,0);card.Controls.Add(state.Grid,0,1);card.Tag=state;stackedResults.Controls.Add(card);}
-        stackedResultsVisible=true;dataTabs.Visible=false;stackedResults.Visible=true;stackedResults.BringToFront();LayoutStackedResults();if(queryStates.Count>0)ActivateResult(queryStates[0]);stackedResults.ResumeLayout(true);
+        if(stackedResults==null||queryStates.Count<2)return;stackedResults.SuspendLayout();stackedResults.Controls.Clear();int index=0;TableLayoutPanel previousCard=null;
+        foreach(QueryResultState state in queryStates){
+            index++;var card=new TableLayoutPanel{ColumnCount=1,RowCount=2,Margin=new Padding(2),Padding=new Padding(0),CellBorderStyle=TableLayoutPanelCellBorderStyle.Single,BackColor=Color.FromArgb(236,238,240)};card.RowStyles.Add(new RowStyle(SizeType.Absolute,24));card.RowStyles.Add(new RowStyle(SizeType.Percent,100));
+            var title=new Label{Dock=DockStyle.Fill,AutoEllipsis=true,TextAlign=ContentAlignment.MiddleLeft,Padding=new Padding(7,0,3,0),BackColor=Color.FromArgb(207,215,222),ForeColor=Color.FromArgb(35,41,48),Font=new Font(Font,FontStyle.Bold),Text=StackedResultTitle(state,index),Tag=state};title.Click+=delegate(object sender,EventArgs e){ActivateResult(state);};
+            if(state.Grid.Parent!=null)state.Grid.Parent.Controls.Remove(state.Grid);state.Grid.Dock=DockStyle.Fill;card.Controls.Add(title,0,0);card.Controls.Add(state.Grid,0,1);card.Tag=state;
+            if(previousCard!=null){var divider=new ResultGridDivider{Tag="SQL_RESULT_DIVIDER",UpperCard=previousCard,LowerCard=card,Height=9,Margin=new Padding(5,3,5,3)};tips.SetToolTip(divider,"Arraste para redimensionar as grades. Dê duplo clique para igualar as duas.");stackedResults.Controls.Add(divider);}stackedResults.Controls.Add(card);previousCard=card;
+        }
+        stackedHeightsInitialized=false;stackedResultsVisible=true;dataTabs.Visible=false;stackedResults.Visible=true;stackedResults.BringToFront();LayoutStackedResults();if(queryStates.Count>0)ActivateResult(queryStates[0]);stackedResults.ResumeLayout(true);
     }
     void LayoutStackedResults() {
-        if(stackedResults==null||!stackedResultsVisible)return;int count=Math.Max(1,stackedResults.Controls.Count);int height=Math.Max(145,Math.Min(300,(stackedResults.ClientSize.Height-12)/count));int width=Math.Max(200,stackedResults.ClientSize.Width-26);
-        foreach(Control control in stackedResults.Controls){control.Width=width;control.Height=height;var card=control as TableLayoutPanel;if(card!=null&&card.Controls.Count>0){QueryResultState state=card.Tag as QueryResultState;Label title=card.Controls[0] as Label;if(state!=null&&title!=null)title.Text=state.Sql.Trim().Replace("\r"," ").Replace("\n"," ")+"    |    "+state.Table.Rows.Count.ToString()+" registro(s)";}}
-    }
-    bool ConfirmPendingEdits() {
+        if(stackedResults==null||!stackedResultsVisible)return;
+        var cards=new List<TableLayoutPanel>();foreach(Control control in stackedResults.Controls){var card=control as TableLayoutPanel;if(card!=null)cards.Add(card);}
+        int count=Math.Max(1,cards.Count),dividers=Math.Max(0,count-1),dividerHeight=9,width=Math.Max(200,stackedResults.ClientSize.Width-26);
+        int available=Math.Max(count*145,stackedResults.ClientSize.Height-12-(dividers*15));int oldTotal=0;foreach(TableLayoutPanel card in cards)oldTotal+=Math.Max(0,card.Height);
+        if(!stackedHeightsInitialized||oldTotal<=0){int height=Math.Max(145,available/count);foreach(TableLayoutPanel card in cards)card.Height=height;stackedHeightsInitialized=true;}
+        else {int assigned=0;for(int i=0;i<cards.Count;i++){int height=i==cards.Count-1?Math.Max(145,available-assigned):Math.Max(145,(int)Math.Round((double)cards[i].Height*available/oldTotal));cards[i].Height=height;assigned+=height;}}
+        int queryIndex=0;foreach(Control control in stackedResults.Controls){ResultGridDivider divider=control as ResultGridDivider;if(divider!=null){divider.Width=width;divider.Height=dividerHeight;continue;}control.Width=width;var card=control as TableLayoutPanel;if(card!=null&&card.Controls.Count>0){queryIndex++;QueryResultState state=card.Tag as QueryResultState;Label title=card.Controls[0] as Label;if(state!=null&&title!=null)title.Text=StackedResultTitle(state,queryIndex);}}
+    }    bool ConfirmPendingEdits() {
         if(activeState==null)return true;if(activeState.Editing){CloseInlineCellEditor(true);activeState.Grid.EndEdit();}if(activeState.Table.GetChanges()==null)return true;
         var answer=MessageBox.Show(this,"Há alterações ainda não salvas. O que deseja fazer?\r\n\r\nSim — salvar no banco\r\nNão — descartar as alterações\r\nCancelar — voltar à edição","Alterações pendentes",MessageBoxButtons.YesNoCancel,MessageBoxIcon.Warning);
         if(answer==DialogResult.Yes){SaveEdits();return activeState!=null&&activeState.Table.GetChanges()==null;}
