@@ -32,7 +32,7 @@ internal static class ConsultaSQLUpdater {
             string tag=Convert.ToString(release["tag_name"],CultureInfo.InvariantCulture);
             Version newest;if(String.IsNullOrWhiteSpace(tag)||!Version.TryParse(tag.TrimStart('v','V'),out newest)){LastDiagnostic="A versão informada pelo GitHub não pôde ser interpretada.";return null;}
             Version current=typeof(Program).Assembly.GetName().Version;
-            if(newest==current){LastDiagnostic="Nenhuma atualização disponível. Versão em uso: "+Program.VersionDisplay+".";return null;}
+            if(newest<=current){LastDiagnostic="Nenhuma atualização disponível. Versão em uso: "+Program.VersionDisplay+".";return null;}
             object[] assets=release["assets"] as object[];
             if(assets==null) { ArrayList list=release["assets"] as ArrayList;if(list!=null)assets=list.ToArray(); }
             if(assets==null){LastDiagnostic="A release "+tag+" não contém uma lista válida de arquivos.";return null;}
