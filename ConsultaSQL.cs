@@ -14,9 +14,9 @@ using System.Windows.Forms;
 
 [assembly: System.Reflection.AssemblyTitle("Consulta SQL Firebird")]
 [assembly: System.Reflection.AssemblyProduct("Consulta SQL Firebird")]
-[assembly: System.Reflection.AssemblyVersion("0.2.0.0")]
-[assembly: System.Reflection.AssemblyFileVersion("0.2.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersion("v0.2.0")]
+[assembly: System.Reflection.AssemblyVersion("0.2.1.0")]
+[assembly: System.Reflection.AssemblyFileVersion("0.2.1.0")]
+[assembly: System.Reflection.AssemblyInformationalVersion("v0.2.1")]
 
 internal static class FirebirdOutputText {
     public static readonly Encoding Encoding = System.Text.Encoding.GetEncoding(65001, EncoderFallback.ReplacementFallback, new Windows1252DecoderFallback());
@@ -1490,50 +1490,69 @@ internal sealed class SavedSqlEntry {
     }    void DeleteSelectedRecord() {
         QueryResultState state=activeState;
         if(state==null||state.Grid==null||state.TableName.Length==0){MessageBox.Show(this,"Execute um SELECT direto sobre uma tabela e selecione a linha que deseja deletar.","Não é possível deletar",MessageBoxButtons.OK,MessageBoxIcon.Information);return;}
-        if(state.Editing||state.Duplicating){MessageBox.Show(this,"Salve ou cancele a edição atual antes de deletar um registro.","Edição em andamento",MessageBoxButtons.OK,MessageBoxIcon.Information);return;}
+        if(state.Editing||state.Duplicating){MessageBox.Show(this,"Salve ou cancele a edição atual antes de deletar registros.","Edição em andamento",MessageBoxButtons.OK,MessageBoxIcon.Information);return;}
         if(!Ready())return;
-        DataGridViewRow selected=state.Grid.CurrentRow;
-        if(selected==null||selected.IsNewRow){MessageBox.Show(this,"Selecione uma linha da grade antes de deletar.","Nenhum registro selecionado",MessageBoxButtons.OK,MessageBoxIcon.Information);return;}
-        int rowIndex=selected.Index;
+        var selectedDataRows=new List<DataRow>();
+        bool deletingMarkedRows=state.Grid.Columns.Contains("CS_SELECT_ROW")&&state.Grid.Columns["CS_SELECT_ROW"].Visible;
+        List<DataGridViewRow> marked=deletingMarkedRows?GetMarkedRows(state.Grid):new List<DataGridViewRow>();
+        if(marked.Count>0){
+            foreach(DataGridViewRow gridRow in marked){
+                DataRowView rowView=gridRow.DataBoundItem as DataRowView;
+                if(rowView==null){MessageBox.Show(this,"Não consegui identificar uma das linhas marcadas. Atualize a consulta e tente novamente.","Registro indisponível",MessageBoxButtons.OK,MessageBoxIcon.Warning);return;}
+                selectedDataRows.Add(rowView.Row);
+            }
+        }else{
+            DataGridViewRow current=state.Grid.CurrentRow;
+            if(current==null||current.IsNewRow){MessageBox.Show(this,deletingMarkedRows?"Marque ao menos uma linha ou selecione uma linha atual para deletar.":"Selecione uma linha da grade antes de deletar.","Nenhum registro selecionado",MessageBoxButtons.OK,MessageBoxIcon.Information);return;}
+            DataRowView currentView=current.DataBoundItem as DataRowView;
+            if(currentView==null){MessageBox.Show(this,"Não consegui identificar a linha atual. Atualize a consulta e tente novamente.","Registro indisponível",MessageBoxButtons.OK,MessageBoxIcon.Warning);return;}
+            selectedDataRows.Add(currentView.Row);deletingMarkedRows=false;
+        }
+        var sourceRowIndexes=new List<int>();
+        foreach(DataRow sourceRow in selectedDataRows){
+            int sourceIndex=sourceRow.Table.Rows.IndexOf(sourceRow);
+            if(sourceIndex<0){MessageBox.Show(this,"Uma das linhas selecionadas não está mais disponível. Atualize a consulta e tente novamente.","Registro indisponível",MessageBoxButtons.OK,MessageBoxIcon.Warning);return;}
+            sourceRowIndexes.Add(sourceIndex);
+        }
         if(!state.MetadataLoaded)LoadEditMetadata(state);
-        if(rowIndex<0||rowIndex>=state.Grid.Rows.Count){MessageBox.Show(this,"A linha selecionada não está mais disponível. Atualize a consulta e tente novamente.","Registro indisponível",MessageBoxButtons.OK,MessageBoxIcon.Warning);return;}
-        DataRowView view=state.Grid.Rows[rowIndex].DataBoundItem as DataRowView;
-        if(view==null){MessageBox.Show(this,"Não consegui identificar a linha selecionada. Atualize a consulta e tente novamente.","Registro indisponível",MessageBoxButtons.OK,MessageBoxIcon.Warning);return;}
-        DataRow row=view.Row;
         bool matchByDbKey=state.UseDbKeyIdentity;
         bool matchByOriginalValues=!matchByDbKey&&state.PrimaryKey.Count==0&&state.UseOriginalValuesAsIdentity;
-        if(!matchByDbKey&&!matchByOriginalValues&&state.PrimaryKey.Count==0){MessageBox.Show(this,"Não encontrei uma chave para identificar com segurança esta linha. Atualize a consulta ou confira os detalhes da tabela.","Não é possível deletar",MessageBoxButtons.OK,MessageBoxIcon.Warning);return;}
-        if(MessageBox.Show(this,"Deletar permanentemente o registro selecionado da tabela "+state.TableName+"?"+Environment.NewLine+Environment.NewLine+"Esta ação não pode ser desfeita.","Confirmar exclusão",MessageBoxButtons.YesNo,MessageBoxIcon.Warning,MessageBoxDefaultButton.Button2)!=DialogResult.Yes)return;
-        var diagnostics=new StringBuilder();diagnostics.AppendLine("CONTEXTO DA TENTATIVA DE EXCLUSÃO");diagnostics.AppendLine("Data/hora: "+DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));diagnostics.AppendLine("Versão: "+Program.VersionDisplay);diagnostics.AppendLine("Banco: "+dbBox.Text.Trim());diagnostics.AppendLine("Tabela: "+state.TableName);diagnostics.AppendLine("Consulta: "+state.Sql);diagnostics.AppendLine("Linha selecionada: "+(rowIndex+1).ToString());
+        if(!matchByDbKey&&!matchByOriginalValues&&state.PrimaryKey.Count==0){MessageBox.Show(this,"Não encontrei uma chave para identificar com segurança os registros selecionados. Atualize a consulta ou confira os detalhes da tabela.","Não é possível deletar",MessageBoxButtons.OK,MessageBoxIcon.Warning);return;}
+        if(MessageBox.Show(this,"Deletar permanentemente "+Quantity(sourceRowIndexes.Count,"registro selecionado","registros selecionados")+" da tabela "+state.TableName+"?"+Environment.NewLine+Environment.NewLine+"Esta ação não pode ser desfeita. Se uma das linhas não puder ser identificada com segurança, nenhuma será deletada.","Confirmar exclusão",MessageBoxButtons.YesNo,MessageBoxIcon.Warning,MessageBoxDefaultButton.Button2)!=DialogResult.Yes)return;
+        var diagnostics=new StringBuilder();diagnostics.AppendLine("CONTEXTO DA TENTATIVA DE EXCLUSÃO");diagnostics.AppendLine("Data/hora: "+DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));diagnostics.AppendLine("Versão: "+Program.VersionDisplay);diagnostics.AppendLine("Banco: "+dbBox.Text.Trim());diagnostics.AppendLine("Tabela: "+state.TableName);diagnostics.AppendLine("Consulta: "+state.Sql);diagnostics.AppendLine("Quantidade solicitada: "+sourceRowIndexes.Count.ToString());diagnostics.AppendLine(deletingMarkedRows?"Linhas selecionadas por caixas de marcação.":"Linha atual da grade.");
         try{
-            var where=new List<string>();
-            if(matchByDbKey){
-                DataColumn locator=FindColumn(row.Table,state.DbKeyColumn);
-                if(locator==null)throw new InvalidOperationException("Não encontrei o identificador interno da linha. Execute novamente a consulta antes de deletar.");
-                string token=Convert.ToString(row[locator]).Trim();
-                if(!Regex.IsMatch(token,@"^[0-9A-Fa-f]{16}$"))throw new InvalidOperationException("O identificador interno da linha está inválido. Execute novamente a consulta antes de deletar.");
-                where.Add("RDB$DB_KEY = CAST(X'"+token+"' AS CHAR(8) CHARACTER SET OCTETS)");
-            }else if(matchByOriginalValues){
-                foreach(DataColumn column in row.Table.Columns){
-                    if(column.ColumnName.StartsWith("CS_INTERNAL_",StringComparison.OrdinalIgnoreCase))continue;
-                    int type;if(state.FieldTypes.TryGetValue(column.ColumnName,out type)&&type==261)continue;
-                    object value=row[column];where.Add(SqlIdentifier(column.ColumnName)+(IsSqlNullValue(value)?" IS NULL":" = "+SqlLiteralForColumn(value,state,column.ColumnName)));
+            var statements=new List<string>();
+            foreach(int rowIndex in sourceRowIndexes){
+                if(rowIndex<0||rowIndex>=state.Table.Rows.Count)throw new InvalidOperationException("Uma das linhas selecionadas não está mais disponível. Atualize a consulta e tente novamente.");
+                DataRow row=state.Table.Rows[rowIndex];var where=new List<string>();
+                if(matchByDbKey){
+                    DataColumn locator=FindColumn(row.Table,state.DbKeyColumn);
+                    if(locator==null)throw new InvalidOperationException("Não encontrei o identificador interno de uma linha. Execute novamente a consulta antes de deletar.");
+                    string token=Convert.ToString(row[locator]).Trim();
+                    if(!Regex.IsMatch(token,@"^[0-9A-Fa-f]{16}$"))throw new InvalidOperationException("O identificador interno de uma linha está inválido. Execute novamente a consulta antes de deletar.");
+                    where.Add("RDB$DB_KEY = CAST(X'"+token+"' AS CHAR(8) CHARACTER SET OCTETS)");
+                }else if(matchByOriginalValues){
+                    foreach(DataColumn column in row.Table.Columns){
+                        if(column.ColumnName.StartsWith("CS_INTERNAL_",StringComparison.OrdinalIgnoreCase))continue;
+                        int type;if(state.FieldTypes.TryGetValue(column.ColumnName,out type)&&type==261)continue;
+                        object value=row[column];where.Add(SqlIdentifier(column.ColumnName)+(IsSqlNullValue(value)?" IS NULL":" = "+SqlLiteralForColumn(value,state,column.ColumnName)));
+                    }
+                    if(where.Count==0)throw new InvalidOperationException("Não encontrei valores que identifiquem uma das linhas. A tabela pode conter somente campos BLOB.");
+                }else{
+                    foreach(string key in state.PrimaryKey){
+                        DataColumn keyColumn=FindColumn(row.Table,key);
+                        if(keyColumn==null)throw new InvalidOperationException("A coluna identificadora '"+key+"' não está no resultado. Execute SELECT * FROM "+state.TableName+" para incluir as chaves.");
+                        object value=row[keyColumn];where.Add(SqlIdentifier(key)+(IsSqlNullValue(value)?" IS NULL":" = "+SqlLiteralForColumn(value,state,key)));
+                    }
                 }
-                if(where.Count==0)throw new InvalidOperationException("Não encontrei valores que identifiquem a linha. A tabela pode conter somente campos BLOB.");
-            }else{
-                foreach(string key in state.PrimaryKey){
-                    DataColumn keyColumn=FindColumn(row.Table,key);
-                    if(keyColumn==null)throw new InvalidOperationException("A coluna identificadora '"+key+"' não está no resultado. Execute SELECT * FROM "+state.TableName+" para incluir as chaves.");
-                    object value=row[keyColumn];where.Add(SqlIdentifier(key)+(IsSqlNullValue(value)?" IS NULL":" = "+SqlLiteralForColumn(value,state,key)));
-                }
+                statements.Add("DELETE FROM "+SqlIdentifier(state.TableName)+" WHERE "+String.Join(" AND ",where.ToArray())+";");
             }
-            string statement="DELETE FROM "+SqlIdentifier(state.TableName)+" WHERE "+String.Join(" AND ",where.ToArray())+";";
-            diagnostics.AppendLine();diagnostics.AppendLine("SQL enviado ao Firebird:");diagnostics.AppendLine(statement);status.Text="Deletando o registro selecionado...";status.ForeColor=Color.DarkOrange;
-            string output=RunIsqlCheckedUpdates(new List<string>{statement});diagnostics.AppendLine();diagnostics.AppendLine("RESPOSTA DO FIREBIRD:");diagnostics.AppendLine(output);
+            diagnostics.AppendLine();diagnostics.AppendLine("SQL enviado ao Firebird:");foreach(string statement in statements)diagnostics.AppendLine(statement);status.Text="Deletando "+Quantity(statements.Count,"registro selecionado","registros selecionados")+"...";status.ForeColor=Color.DarkOrange;
+            string output=RunIsqlCheckedUpdates(statements);diagnostics.AppendLine();diagnostics.AppendLine("RESPOSTA DO FIREBIRD:");diagnostics.AppendLine(output);
             string refreshed=RunIsql(AddDbKeyLocator(state.Sql));
-            if(HasSqlError(refreshed)){outputBox.Text=diagnostics.ToString()+Environment.NewLine+"A exclusão foi confirmada, mas não foi possível atualizar a grade."+Environment.NewLine+refreshed;ShowExecutionError("Registro deletado; falha ao atualizar a grade",outputBox.Text,"Execute novamente a consulta para carregar os dados atuais.");return;}
-            state.Table=BuildResultTable(refreshed);state.Grid.DataSource=state.Table;state.MetadataLoaded=false;state.PrimaryKey.Clear();state.DbKeyColumn="";state.UseDbKeyIdentity=false;state.UseOriginalValuesAsIdentity=false;LoadEditMetadata(state);ActivateResult(state);LayoutStackedResults();outputBox.Text=diagnostics.ToString();status.Text="1 registro deletado da tabela "+state.TableName+".";status.ForeColor=Color.DarkGreen;SetConnectionIndicator("● Conectado",Color.DarkGreen,Color.Honeydew);
-        }catch(Exception ex){diagnostics.AppendLine();diagnostics.AppendLine("EXCEÇÃO COMPLETA:");diagnostics.AppendLine(ex.ToString());outputBox.Text=diagnostics.ToString();ShowExecutionError("Não foi possível deletar o registro",diagnostics.ToString(),"O registro foi mantido se o Firebird não confirmou a exclusão. Confira os detalhes antes de tentar novamente.");}
+            if(HasSqlError(refreshed)){outputBox.Text=diagnostics.ToString()+Environment.NewLine+"A exclusão foi confirmada, mas não foi possível atualizar a grade."+Environment.NewLine+refreshed;ShowExecutionError("Registros deletados; falha ao atualizar a grade",outputBox.Text,"Execute novamente a consulta para carregar os dados atuais.");return;}
+            state.Table=BuildResultTable(refreshed);state.Grid.DataSource=state.Table;state.MetadataLoaded=false;state.PrimaryKey.Clear();state.DbKeyColumn="";state.UseDbKeyIdentity=false;state.UseOriginalValuesAsIdentity=false;LoadEditMetadata(state);ActivateResult(state);LayoutStackedResults();outputBox.Text=diagnostics.ToString();status.Text=Quantity(statements.Count,"registro deletado","registros deletados")+" da tabela "+state.TableName+".";status.ForeColor=Color.DarkGreen;SetConnectionIndicator("● Conectado",Color.DarkGreen,Color.Honeydew);
+        }catch(Exception ex){diagnostics.AppendLine();diagnostics.AppendLine("EXCEÇÃO COMPLETA:");diagnostics.AppendLine(ex.ToString());outputBox.Text=diagnostics.ToString();ShowExecutionError("Não foi possível deletar os registros",diagnostics.ToString(),"Nenhum registro é removido se o Firebird não confirmar todas as linhas. Confira os detalhes antes de tentar novamente.");}
     }    void DuplicateSelectedRecord() {
         if(activeState==null||activeState.Grid==null||activeState.Table==null)return;
         if(activeState.Duplicating){SaveEdits();return;}
