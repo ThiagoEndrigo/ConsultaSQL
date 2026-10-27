@@ -14,9 +14,9 @@ using System.Windows.Forms;
 
 [assembly: System.Reflection.AssemblyTitle("Consulta SQL Firebird")]
 [assembly: System.Reflection.AssemblyProduct("Consulta SQL Firebird")]
-[assembly: System.Reflection.AssemblyVersion("0.2.7.0")]
-[assembly: System.Reflection.AssemblyFileVersion("0.2.7.0")]
-[assembly: System.Reflection.AssemblyInformationalVersion("v0.2.7")]
+[assembly: System.Reflection.AssemblyVersion("0.2.8.0")]
+[assembly: System.Reflection.AssemblyFileVersion("0.2.8.0")]
+[assembly: System.Reflection.AssemblyInformationalVersion("v0.2.8")]
 
 internal static class GeneratedFileUX {
     public static void AskOpenFolder(IWin32Window owner,string filePath,string title) {
@@ -1692,16 +1692,13 @@ internal sealed class SavedSqlEntry {
     SavedCellHighlight CreateSavedCellHighlight(DataRow row,QueryResultState state,List<string> changedFields) {
         var highlight=new SavedCellHighlight();if(row==null||state==null||changedFields==null)return highlight;
         foreach(string field in changedFields)if(!String.IsNullOrWhiteSpace(field))highlight.ChangedFields.Add(field);
-        List<string> identityColumns=new List<string>();
-        if(state.PrimaryKey.Count>0)identityColumns.AddRange(state.PrimaryKey);
-        else foreach(DataColumn column in row.Table.Columns){
-            if(column.ColumnName.StartsWith("CS_INTERNAL_",StringComparison.OrdinalIgnoreCase))continue;
-            int type;if(state.FieldTypes.TryGetValue(column.ColumnName,out type)&&type==261)continue;
-            identityColumns.Add(column.ColumnName);
-        }
-        foreach(string name in identityColumns){
-            DataColumn column=FindColumn(row.Table,name);if(column==null)continue;
-            object value=row[column,DataRowVersion.Current];highlight.IdentityValues[name]=value==null?DBNull.Value:value;
+        DataColumn locator=FindColumn(row.Table,state.DbKeyColumn);
+        if(locator!=null){string token=Convert.ToString(row[locator,DataRowVersion.Current]).Trim();if(Regex.IsMatch(token,@"^[0-9A-Fa-f]{16}$"))highlight.IdentityValues[locator.ColumnName]=token;}
+        if(highlight.IdentityValues.Count==0){
+            List<string> identityColumns=new List<string>();
+            if(state.PrimaryKey.Count>0)identityColumns.AddRange(state.PrimaryKey);
+            else foreach(DataColumn column in row.Table.Columns){if(column.ColumnName.StartsWith("CS_INTERNAL_",StringComparison.OrdinalIgnoreCase))continue;int type;if(state.FieldTypes.TryGetValue(column.ColumnName,out type)&&type==261)continue;identityColumns.Add(column.ColumnName);}
+            foreach(string name in identityColumns){DataColumn column=FindColumn(row.Table,name);if(column==null)continue;object value=row[column,DataRowVersion.Current];highlight.IdentityValues[name]=value==null?DBNull.Value:value;}
         }
         return highlight;
     }
