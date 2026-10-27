@@ -14,9 +14,9 @@ using System.Windows.Forms;
 
 [assembly: System.Reflection.AssemblyTitle("Consulta SQL Firebird")]
 [assembly: System.Reflection.AssemblyProduct("Consulta SQL Firebird")]
-[assembly: System.Reflection.AssemblyVersion("0.2.13.0")]
-[assembly: System.Reflection.AssemblyFileVersion("0.2.13.0")]
-[assembly: System.Reflection.AssemblyInformationalVersion("v0.2.13")]
+[assembly: System.Reflection.AssemblyVersion("0.2.14.0")]
+[assembly: System.Reflection.AssemblyFileVersion("0.2.14.0")]
+[assembly: System.Reflection.AssemblyInformationalVersion("v0.2.14")]
 
 internal static class GeneratedFileUX {
     public static void AskOpenFolder(IWin32Window owner,string filePath,string title) {
@@ -1381,7 +1381,7 @@ internal sealed class SavedSqlEntry {
     }
     bool IsUrlColumn(string name) {string field=(name??"").Trim();return String.Equals(field,"URL",StringComparison.OrdinalIgnoreCase)||field.EndsWith("_URL",StringComparison.OrdinalIgnoreCase)||field.EndsWith("URL",StringComparison.OrdinalIgnoreCase);}
     string CompactHtmlCell(string value,string columnName=null) {
-        string text=value??"";bool url=IsUrlColumn(columnName)||Regex.IsMatch(text,@"^https?://",RegexOptions.IgnoreCase);int limit=url?42:58;if(text.Length<=limit)return "<div class=\"cell-value\" title=\""+System.Net.WebUtility.HtmlEncode(text)+"\">"+System.Net.WebUtility.HtmlEncode(text)+"</div>";
+        string text=value??"";bool url=IsUrlColumn(columnName)||Regex.IsMatch(text,@"^https?://",RegexOptions.IgnoreCase);int limit=32;if(text.Length<=limit)return "<div class=\"cell-value\" title=\""+System.Net.WebUtility.HtmlEncode(text)+"\">"+System.Net.WebUtility.HtmlEncode(text)+"</div>";
         string preview=System.Net.WebUtility.HtmlEncode(text.Substring(0,limit-1))+"…";return "<div class=\"cell-preview\"><span class=\"cell-preview-text\" title=\""+System.Net.WebUtility.HtmlEncode(text)+"\">"+preview+"</span><details class=\"long-value"+(url?" url-value":"")+"\"><summary>Ver</summary><div class=\"long-value-content\">"+System.Net.WebUtility.HtmlEncode(text)+"</div></details></div>";
     }
     string ApplyCompactExportStyles(string document) {
