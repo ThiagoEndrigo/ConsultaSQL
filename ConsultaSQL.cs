@@ -14,9 +14,9 @@ using System.Windows.Forms;
 
 [assembly: System.Reflection.AssemblyTitle("Consulta SQL Firebird")]
 [assembly: System.Reflection.AssemblyProduct("Consulta SQL Firebird")]
-[assembly: System.Reflection.AssemblyVersion("0.2.6.0")]
-[assembly: System.Reflection.AssemblyFileVersion("0.2.6.0")]
-[assembly: System.Reflection.AssemblyInformationalVersion("v0.2.6")]
+[assembly: System.Reflection.AssemblyVersion("0.2.7.0")]
+[assembly: System.Reflection.AssemblyFileVersion("0.2.7.0")]
+[assembly: System.Reflection.AssemblyInformationalVersion("v0.2.7")]
 
 internal static class GeneratedFileUX {
     public static void AskOpenFolder(IWin32Window owner,string filePath,string title) {
