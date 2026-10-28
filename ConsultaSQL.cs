@@ -14,9 +14,9 @@ using System.Windows.Forms;
 
 [assembly: System.Reflection.AssemblyTitle("Consulta SQL Firebird")]
 [assembly: System.Reflection.AssemblyProduct("Consulta SQL Firebird")]
-[assembly: System.Reflection.AssemblyVersion("0.2.15.0")]
-[assembly: System.Reflection.AssemblyFileVersion("0.2.15.0")]
-[assembly: System.Reflection.AssemblyInformationalVersion("v0.2.15")]
+[assembly: System.Reflection.AssemblyVersion("0.2.16.0")]
+[assembly: System.Reflection.AssemblyFileVersion("0.2.16.0")]
+[assembly: System.Reflection.AssemblyInformationalVersion("v0.2.16")]
 
 internal static class GeneratedFileUX {
     public static void AskOpenFolder(IWin32Window owner,string filePath,string title) {
@@ -1082,6 +1082,8 @@ internal sealed class SavedSqlEntry {
     }
     void QueueSqlEditorAssist() { if(sqlAssistTimer==null)return;sqlAssistTimer.Stop();sqlAssistTimer.Start(); }
     [DllImport("user32.dll")] static extern IntPtr SendEditorMessage(IntPtr handle,int message,IntPtr wParam,IntPtr lParam);
+    [DllImport("user32.dll")] static extern bool HideCaret(IntPtr handle);
+    [DllImport("user32.dll")] static extern bool ShowCaret(IntPtr handle);
     Color SqlTokenColor(Match token) {
         string value=token.Value;
         if(value.StartsWith("--",StringComparison.Ordinal)||value.StartsWith("/*",StringComparison.Ordinal))return Color.FromArgb(145,155,165);
@@ -1099,13 +1101,14 @@ internal sealed class SavedSqlEntry {
         try{firstVisible=SendEditorMessage(sqlBox.Handle,0x00CE,IntPtr.Zero,IntPtr.Zero).ToInt32();}catch{}
         string pattern=@"--[^\r\n]*|/\*[\s\S]*?\*/|'(?:''|[^'])*'|""(?:""""|[^""])*""|:[A-Za-z_][A-Za-z0-9_$]*|\b(?:SELECT|DISTINCT|FROM|WHERE|AND|OR|NOT|IN|EXISTS|BETWEEN|LIKE|IS|NULL|AS|ON|JOIN|INNER|LEFT|RIGHT|FULL|OUTER|CROSS|GROUP|BY|HAVING|ORDER|ASC|DESC|FIRST|SKIP|ROWS|OFFSET|UNION|CASE|WHEN|THEN|ELSE|END|WITH|RECURSIVE|INSERT|INTO|VALUES|UPDATE|SET|DELETE|MERGE|RETURNING|CREATE|ALTER|DROP|TABLE|VIEW|INDEX|TRIGGER|PROCEDURE|EXECUTE|COMMIT|ROLLBACK|PRIMARY|KEY|FOREIGN|REFERENCES|UNIQUE|CHECK|DEFAULT|CONSTRAINT|CAST|COALESCE|NULLIF|COUNT|SUM|AVG|MIN|MAX|UPPER|LOWER|SUBSTRING|TRIM|CURRENT_DATE|CURRENT_TIME|CURRENT_TIMESTAMP|CURRENT_USER|GEN_ID|EXTRACT|DATEADD|DATEDIFF|CONTAINING|STARTING|SIMILAR|PLAN|DECLARE|SUSPEND|COLLATE)\b|\b\d+(?:[.,]\d+)?\b";
         MatchCollection tokens=Regex.Matches(text,pattern,RegexOptions.IgnoreCase);
-        sqlBox.SuspendLayout();
+        IntPtr editorHandle=sqlBox.Handle;bool caretHidden=false,redrawDisabled=false;sqlBox.SuspendLayout();
         try {
+            if(sqlBox.Focused)caretHidden=HideCaret(editorHandle);SendEditorMessage(editorHandle,0x000B,IntPtr.Zero,IntPtr.Zero);redrawDisabled=true;
             sqlBox.SelectAll();sqlBox.SelectionColor=Color.FromArgb(230,232,235);
             foreach(Match token in tokens){sqlBox.Select(token.Index,token.Length);sqlBox.SelectionColor=SqlTokenColor(token);}
             selectionStart=Math.Max(0,Math.Min(selectionStart,sqlBox.TextLength));selectionLength=Math.Max(0,Math.Min(selectionLength,sqlBox.TextLength-selectionStart));sqlBox.Select(selectionStart,selectionLength);
             if(selectionLength==0){Color caretColor=Color.FromArgb(230,232,235);foreach(Match token in tokens)if(selectionStart>=token.Index&&selectionStart<=token.Index+token.Length){caretColor=SqlTokenColor(token);break;}sqlBox.SelectionColor=caretColor;}
-        } finally { sqlBox.ResumeLayout(); }
+        } finally { sqlBox.ResumeLayout();if(redrawDisabled){SendEditorMessage(editorHandle,0x000B,new IntPtr(1),IntPtr.Zero);sqlBox.Invalidate();}if(caretHidden&&sqlBox.Focused)ShowCaret(editorHandle); }
         try{int now=SendEditorMessage(sqlBox.Handle,0x00CE,IntPtr.Zero,IntPtr.Zero).ToInt32();int delta=firstVisible-now;if(delta!=0)SendEditorMessage(sqlBox.Handle,0x00B6,IntPtr.Zero,new IntPtr(delta));}catch{}
     }
     void RefreshSqlEditorAssist() { if(sqlBox==null||sqlBox.IsDisposed||IsDisposed)return;if(sqlBox.TextLength>40000||sqlBox.Lines.Length>100){if(sqlVariableStatus!=null){sqlVariableStatus.Text="Script extenso: validação visual de variáveis pausada para manter o editor responsivo. A execução e a substituição continuam disponíveis.";sqlVariableStatus.ForeColor=Color.DimGray;sqlVariableStatus.BackColor=Color.FromArgb(226,229,232);sqlVariableStatus.Visible=true;}UpdateTableSuggestions();return;}UpdateVariableDiagnostics();UpdateTableSuggestions(); }
