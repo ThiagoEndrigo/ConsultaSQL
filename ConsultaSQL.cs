@@ -14,9 +14,9 @@ using System.Windows.Forms;
 
 [assembly: System.Reflection.AssemblyTitle("Consulta SQL Firebird")]
 [assembly: System.Reflection.AssemblyProduct("Consulta SQL Firebird")]
-[assembly: System.Reflection.AssemblyVersion("0.2.16.0")]
-[assembly: System.Reflection.AssemblyFileVersion("0.2.16.0")]
-[assembly: System.Reflection.AssemblyInformationalVersion("v0.2.16")]
+[assembly: System.Reflection.AssemblyVersion("0.2.17.0")]
+[assembly: System.Reflection.AssemblyFileVersion("0.2.17.0")]
+[assembly: System.Reflection.AssemblyInformationalVersion("v0.2.17")]
 
 internal static class GeneratedFileUX {
     public static void AskOpenFolder(IWin32Window owner,string filePath,string title) {
@@ -1081,7 +1081,7 @@ internal sealed class SavedSqlEntry {
         string value=suggestion.InsertText;int start=caret-token.Length;applyingTableSuggestion=true;try{sqlBox.Text=sqlBox.Text.Remove(start,token.Length).Insert(start,value);sqlBox.SelectionStart=start+value.Length;}finally{applyingTableSuggestion=false;}tableSuggestionPopup.Hide();sqlBox.Focus();sqlBox.SelectionStart=start+value.Length;
     }
     void QueueSqlEditorAssist() { if(sqlAssistTimer==null)return;sqlAssistTimer.Stop();sqlAssistTimer.Start(); }
-    [DllImport("user32.dll")] static extern IntPtr SendEditorMessage(IntPtr handle,int message,IntPtr wParam,IntPtr lParam);
+    [DllImport("user32.dll",EntryPoint="SendMessageW",ExactSpelling=true)] static extern IntPtr SendEditorMessage(IntPtr handle,int message,IntPtr wParam,IntPtr lParam);
     [DllImport("user32.dll")] static extern bool HideCaret(IntPtr handle);
     [DllImport("user32.dll")] static extern bool ShowCaret(IntPtr handle);
     Color SqlTokenColor(Match token) {
