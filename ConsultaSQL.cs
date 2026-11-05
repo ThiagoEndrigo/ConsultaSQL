@@ -14,9 +14,9 @@ using System.Windows.Forms;
 
 [assembly: System.Reflection.AssemblyTitle("Consulta SQL Firebird")]
 [assembly: System.Reflection.AssemblyProduct("Consulta SQL Firebird")]
-[assembly: System.Reflection.AssemblyVersion("0.2.29.0")]
-[assembly: System.Reflection.AssemblyFileVersion("0.2.29.0")]
-[assembly: System.Reflection.AssemblyInformationalVersion("v0.2.29")]
+[assembly: System.Reflection.AssemblyVersion("0.2.30.0")]
+[assembly: System.Reflection.AssemblyFileVersion("0.2.30.0")]
+[assembly: System.Reflection.AssemblyInformationalVersion("v0.2.30")]
 
 internal static class GeneratedFileUX {
     public static void AskOpenFolder(IWin32Window owner,string filePath,string title) {
@@ -1210,14 +1210,21 @@ internal sealed class SavedSqlEntry {
         }
     }    static string NormalizeFirebirdDate(string value) { if(String.IsNullOrWhiteSpace(value)||!Regex.IsMatch(value,@"^\d{1,2}-[A-Za-z]{3}-\d{4}$"))return value;DateTime parsed;if(DateTime.TryParseExact(value,new string[]{"d-MMM-yyyy","dd-MMM-yyyy"},System.Globalization.CultureInfo.InvariantCulture,System.Globalization.DateTimeStyles.None,out parsed))return parsed.ToString("dd.MM.yyyy",System.Globalization.CultureInfo.InvariantCulture);return value; }
     string GetSimpleTableName(string sql) {
-        string text=sql??"";if(Regex.IsMatch(text,@"\b(JOIN|UNION|GROUP\s+BY|HAVING|DISTINCT)\b",RegexOptions.IgnoreCase))return "";
-        Match m=Regex.Match(text,@"^\s*SELECT\s+(?<projection>[\s\S]*?)\s+FROM\s+(?<quoted>""(?:""""|[^""])+""|(?<plain>[A-Za-z][A-Za-z0-9_$]*))(?<tail>[\s\S]*)$",RegexOptions.IgnoreCase);
-        if(!m.Success)return "";string projection=m.Groups["projection"].Value.Trim();
-        if(projection!="*"&&!Regex.IsMatch(projection,@"^(?:""(?:""""|[^""])+""|[A-Za-z][A-Za-z0-9_$]*)(?:\s*,\s*(?:""(?:""""|[^""])+""|[A-Za-z][A-Za-z0-9_$]*))*$"))return "";
-        string tail=m.Groups["tail"].Value;if(!Regex.IsMatch(tail,@"^\s*(?:(?:AS\s+)?[A-Za-z][A-Za-z0-9_$]*\s+)?(?:WHERE\b|ORDER\s+BY\b|ROWS\b|FIRST\b|SKIP\b|FETCH\b|PLAN\b|WITH\s+LOCK\b|FOR\s+UPDATE\b|;|$)[\s\S]*$",RegexOptions.IgnoreCase))return "";
-        return m.Groups["quoted"].Success?m.Groups["quoted"].Value.Replace("\"\"","\""):m.Groups["plain"].Value.ToUpperInvariant();
-    }
-    string AddDbKeyLocator(string sql) {
+        string text=sql??"";
+        Match m=Regex.Match(text,@"^\s*SELECT\s+(?<projection>[\s\S]*?)\s+FROM\s+(?<quoted>""(?:""""|[^""])+""|(?<plain>[A-Za-z][A-Za-z0-9_$]*))(?<source>[\s\S]*?)\s+WHERE\b",RegexOptions.IgnoreCase);
+        if(m.Success){
+            string projection=m.Groups["projection"].Value.Trim();string source=m.Groups["source"].Value.Trim();
+            Match alias=Regex.Match(source,@"^(?:(?:AS\s+)?(?<alias>[A-Za-z][A-Za-z0-9_$]*)\s*)?$",RegexOptions.IgnoreCase);
+            if(alias.Success&&Regex.IsMatch(projection,@"^(?:\*|"+Regex.Escape(alias.Groups["alias"].Value)+@"\.\*)$",RegexOptions.IgnoreCase))
+                return m.Groups["quoted"].Success?m.Groups["quoted"].Value:m.Groups["plain"].Value.ToUpperInvariant();
+        }
+        if(Regex.IsMatch(text,@"\b(JOIN|UNION|GROUP\s+BY|HAVING|DISTINCT)\b",RegexOptions.IgnoreCase))return "";
+        Match simple=Regex.Match(text,@"^\s*SELECT\s+(?<projection>[\s\S]*?)\s+FROM\s+(?<quoted>""(?:""""|[^""])+""|(?<plain>[A-Za-z][A-Za-z0-9_$]*))(?<tail>[\s\S]*)$",RegexOptions.IgnoreCase);
+        if(!simple.Success)return "";string p=simple.Groups["projection"].Value.Trim();
+        if(p!="*"&&!Regex.IsMatch(p,@"^(?:""(?:""""|[^""])+""|[A-Za-z][A-Za-z0-9_$]*)(?:\s*,\s*(?:""(?:""""|[^""])+""|[A-Za-z][A-Za-z0-9_$]*))*$"))return "";
+        string tail=simple.Groups["tail"].Value;if(!Regex.IsMatch(tail,@"^\s*(?:(?:AS\s+)?[A-Za-z][A-Za-z0-9_$]*\s+)?(?:WHERE\b|ORDER\s+BY\b|ROWS\b|FIRST\b|SKIP\b|FETCH\b|PLAN\b|WITH\s+LOCK\b|FOR\s+UPDATE\b|;|$)[\s\S]*$",RegexOptions.IgnoreCase))return "";
+        return simple.Groups["quoted"].Success?simple.Groups["quoted"].Value:simple.Groups["plain"].Value.ToUpperInvariant();
+    }    string AddDbKeyLocator(string sql) {
         if(GetSimpleTableName(sql).Length==0)return sql??"";
         // Firebird does not accept a bare '*' beside another select item. Qualify it
         // with the base relation, and only inject on unaliased direct-table SELECT *.
