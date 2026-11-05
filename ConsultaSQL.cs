@@ -14,9 +14,9 @@ using System.Windows.Forms;
 
 [assembly: System.Reflection.AssemblyTitle("Consulta SQL Firebird")]
 [assembly: System.Reflection.AssemblyProduct("Consulta SQL Firebird")]
-[assembly: System.Reflection.AssemblyVersion("0.2.30.0")]
-[assembly: System.Reflection.AssemblyFileVersion("0.2.30.0")]
-[assembly: System.Reflection.AssemblyInformationalVersion("v0.2.30")]
+[assembly: System.Reflection.AssemblyVersion("0.2.31.0")]
+[assembly: System.Reflection.AssemblyFileVersion("0.2.31.0")]
+[assembly: System.Reflection.AssemblyInformationalVersion("v0.2.31")]
 
 internal static class GeneratedFileUX {
     public static void AskOpenFolder(IWin32Window owner,string filePath,string title) {
@@ -1226,12 +1226,14 @@ internal sealed class SavedSqlEntry {
         return simple.Groups["quoted"].Success?simple.Groups["quoted"].Value:simple.Groups["plain"].Value.ToUpperInvariant();
     }    string AddDbKeyLocator(string sql) {
         if(GetSimpleTableName(sql).Length==0)return sql??"";
-        // Firebird does not accept a bare '*' beside another select item. Qualify it
-        // with the base relation, and only inject on unaliased direct-table SELECT *.
-        Match match=Regex.Match(sql??"",@"^\s*SELECT\s+\*\s+FROM\s+(?<table>""[^""]+""|[A-Za-z][A-Za-z0-9_$]*)(?=\s*(?:WHERE\b|ORDER\b|GROUP\b|HAVING\b|ROWS\b|FIRST\b|SKIP\b|FETCH\b|PLAN\b|WITH\b|FOR\b|;|$))",RegexOptions.IgnoreCase);
-        if(!match.Success)return sql??"";int star=(sql??"").IndexOf('*',match.Index,match.Length);if(star<0)return sql??"";string relation=match.Groups["table"].Value;return sql.Substring(0,star)+relation+".*, RDB$DB_KEY AS "+DbKeyLocatorColumn+sql.Substring(star+1);
-    }
-    string GetSingleTableSourceName(string sql) {
+        string text=sql??"";
+        Match aliased=Regex.Match(text,@"^\s*SELECT\s+(?<alias>[A-Za-z][A-Za-z0-9_$]*)\.\*\s+FROM\s+(?<table>""[^""]+""|[A-Za-z][A-Za-z0-9_$]*)(?:\s+(?:AS\s+)?(?<sourceAlias>[A-Za-z][A-Za-z0-9_$]*))?\s+WHERE\b",RegexOptions.IgnoreCase);
+        if(aliased.Success&&String.Equals(aliased.Groups["alias"].Value,aliased.Groups["sourceAlias"].Value,StringComparison.OrdinalIgnoreCase)){
+            int star=text.IndexOf('*',aliased.Index,aliased.Length);if(star>=0)return text.Substring(0,star+1)+", RDB$DB_KEY AS "+DbKeyLocatorColumn+text.Substring(star+1);
+        }
+        Match match=Regex.Match(text,@"^\s*SELECT\s+\*\s+FROM\s+(?<table>""[^""]+""|[A-Za-z][A-Za-z0-9_$]*)(?=\s*(?:WHERE\b|ORDER\b|GROUP\b|HAVING\b|ROWS\b|FIRST\b|SKIP\b|FETCH\b|PLAN\b|WITH\b|FOR\b|;|$))",RegexOptions.IgnoreCase);
+        if(!match.Success)return text;int position=text.IndexOf('*',match.Index,match.Length);if(position<0)return text;string relation=match.Groups["table"].Value;return text.Substring(0,position)+relation+".*, RDB$DB_KEY AS "+DbKeyLocatorColumn+text.Substring(position+1);
+    }    string GetSingleTableSourceName(string sql) {
         string text=sql??"";if(Regex.IsMatch(text,@"\b(JOIN|UNION)\b",RegexOptions.IgnoreCase))return "";
         Match m=Regex.Match(text,@"\bFROM\s+(?:""(?<quoted>[^""]+)""|(?<plain>[A-Za-z][A-Za-z0-9_$]*))(?=\s|;|$)",RegexOptions.IgnoreCase);
         if(!m.Success)return "";return m.Groups["quoted"].Success?m.Groups["quoted"].Value:m.Groups["plain"].Value.ToUpperInvariant();
