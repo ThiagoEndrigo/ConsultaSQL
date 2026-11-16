@@ -14,9 +14,9 @@ using System.Windows.Forms;
 
 [assembly: System.Reflection.AssemblyTitle("Consulta SQL Firebird")]
 [assembly: System.Reflection.AssemblyProduct("Consulta SQL Firebird")]
-[assembly: System.Reflection.AssemblyVersion("0.2.33.0")]
-[assembly: System.Reflection.AssemblyFileVersion("0.2.33.0")]
-[assembly: System.Reflection.AssemblyInformationalVersion("v0.2.33")]
+[assembly: System.Reflection.AssemblyVersion("0.2.35.0")]
+[assembly: System.Reflection.AssemblyFileVersion("0.2.35.0")]
+[assembly: System.Reflection.AssemblyInformationalVersion("v0.2.35")]
 
 internal static class GeneratedFileUX {
     public static void AskOpenFolder(IWin32Window owner,string filePath,string title) {
@@ -110,18 +110,6 @@ internal sealed class BackupPasswordForm : Form {
         passwordBox=new TextBox{Location=new Point(14,60),Size=new Size(400,24),UseSystemPasswordChar=true};Controls.Add(passwordBox);
         var cancel=new Button{Text="Cancelar",DialogResult=DialogResult.Cancel,Location=new Point(248,101),Size=new Size(80,28)};Controls.Add(cancel);
         var ok=new Button{Text="Continuar",DialogResult=DialogResult.OK,Location=new Point(334,101),Size=new Size(80,28)};Controls.Add(ok);AcceptButton=ok;CancelButton=cancel;
-    }
-}
-
-internal sealed class PathConfigurationPasswordForm : Form {
-    const string ConfirmationPassword = "ajustapath";
-    readonly TextBox passwordBox;
-    public PathConfigurationPasswordForm() {
-        Text="Confirmar configuração de paths";Icon=System.Drawing.Icon.ExtractAssociatedIcon(Application.ExecutablePath);StartPosition=FormStartPosition.CenterParent;FormBorderStyle=FormBorderStyle.FixedDialog;MinimizeBox=false;MaximizeBox=false;ShowInTaskbar=false;ClientSize=new Size(410,145);
-        Controls.Add(new Label{Text="Informe a senha de confirmação para configurar os paths:",AutoSize=false,Location=new Point(14,14),Size=new Size(380,34)});
-        passwordBox=new TextBox{Location=new Point(14,52),Size=new Size(380,24),UseSystemPasswordChar=true};Controls.Add(passwordBox);
-        var cancel=new Button{Text="Cancelar",DialogResult=DialogResult.Cancel,Location=new Point(224,101),Size=new Size(80,28)};Controls.Add(cancel);
-        var ok=new Button{Text="Continuar",Location=new Point(310,101),Size=new Size(84,28)};ok.Click+=(s,e)=>{if(!String.Equals(passwordBox.Text,ConfirmationPassword,StringComparison.Ordinal)){MessageBox.Show(this,"Senha de confirmação incorreta.","Acesso negado",MessageBoxButtons.OK,MessageBoxIcon.Warning);passwordBox.Clear();passwordBox.Focus();return;}DialogResult=DialogResult.OK;Close();};Controls.Add(ok);AcceptButton=ok;CancelButton=cancel;
     }
 }
 
@@ -1007,11 +995,21 @@ internal sealed class SavedSqlEntry {
     void ConfigureCompanyPaths() {
         if(!connectionValidated||!Ready()){MessageBox.Show(this,"Conecte ao banco e valide a senha do SYSDBA antes de configurar os paths.","Conexão necessária",MessageBoxButtons.OK,MessageBoxIcon.Information);return;}
         string database=Path.GetFullPath(dbBox.Text.Trim());if(!File.Exists(database)){MessageBox.Show(this,"O arquivo do banco selecionado não foi encontrado.","Banco não encontrado",MessageBoxButtons.OK,MessageBoxIcon.Warning);return;}
-        using(var prompt=new PathConfigurationPasswordForm())if(prompt.ShowDialog(this)!=DialogResult.OK)return;
-        string directory=Path.GetDirectoryName(database);if(String.IsNullOrWhiteSpace(directory))return;string path=directory.TrimEnd(Path.DirectorySeparatorChar,Path.AltDirectorySeparatorChar)+Path.DirectorySeparatorChar;
-        if(MessageBox.Show(this,"Os quatro campos da tabela EMPRESAS serão definidos para:\r\n\r\n"+path+"\r\n\r\nDeseja continuar?","Confirmar configuração dos paths",MessageBoxButtons.YesNo,MessageBoxIcon.Warning,MessageBoxDefaultButton.Button2)!=DialogResult.Yes)return;
-        string literal="'"+path.Replace("'","''")+"'";string sql="UPDATE EMPRESAS SET PATHENVIO_EMAIL="+literal+", PATHRECEBE_EMAIL="+literal+", PATH_SERVIDOR="+literal+", PATH_ALIAS="+literal+";\r\nCOMMIT;";
-        try{string output=RunIsql(sql,database,passBox.Text);outputBox.Text=output;if(HasSqlError(output)){ShowExecutionError("Não foi possível configurar os paths",output,"Confira se a tabela EMPRESAS contém os quatro campos solicitados.");return;}status.Text="Paths configurados para "+path;status.ForeColor=Color.DarkGreen;MessageBox.Show(this,"Os paths da tabela EMPRESAS foram atualizados para:\r\n"+path,"Paths configurados",MessageBoxButtons.OK,MessageBoxIcon.Information);}catch(Exception ex){ShowExecutionError("Não foi possível configurar os paths",ex.ToString(),"Confira a conexão e os campos da tabela EMPRESAS.");}
+        string databaseDirectory=Path.GetDirectoryName(database);if(String.IsNullOrWhiteSpace(databaseDirectory))return;string databasePath=databaseDirectory.TrimEnd(Path.DirectorySeparatorChar,Path.AltDirectorySeparatorChar)+Path.DirectorySeparatorChar;
+        string[] expected={"EMPRESAS.PATHENVIO_EMAIL","EMPRESAS.PATHRECEBE_EMAIL","EMPRESAS.PATH_SERVIDOR","EMPRESAS.PATH_ALIAS","CONFIG.PATHCARGA","CONFIG.PATHCARGACAIXA","CONFIG.PATHGERENCIADORIMP"};
+        string metadata="SELECT TRIM(RF.RDB$RELATION_NAME) AS TABELA, TRIM(RF.RDB$FIELD_NAME) AS CAMPO FROM RDB$RELATION_FIELDS RF WHERE RF.RDB$RELATION_NAME IN ('EMPRESAS','CONFIG') ORDER BY RF.RDB$RELATION_NAME, RF.RDB$FIELD_NAME;";
+        try{
+            string metadataOutput=RunIsql(metadata,database,passBox.Text);if(HasSqlError(metadataOutput)){ShowExecutionError("Não foi possível conferir os campos",metadataOutput,"Confira o acesso aos metadados do banco.");return;}
+            var available=new HashSet<string>(StringComparer.OrdinalIgnoreCase);foreach(Dictionary<string,string> row in ParseListRows(metadataOutput)){string table,field;if(row.TryGetValue("TABELA",out table)&&row.TryGetValue("CAMPO",out field))available.Add(table.Trim()+"."+field.Trim());}
+            var missing=new List<string>();foreach(string field in expected)if(!available.Contains(field))missing.Add(field);
+            if(missing.Count>0){MessageBox.Show(this,"Não foi possível localizar os seguintes campos no banco:\r\n\r\n"+String.Join("\r\n",missing.ToArray())+"\r\n\r\nNenhum path foi alterado.","Campos não encontrados",MessageBoxButtons.OK,MessageBoxIcon.Warning);return;}
+            string receive=@"C:\GOURMET\RECEBER\",send=@"C:\GOURMET\ENVIAR\",sales=@"C:\GOURMET\VENDAS\",spooler=@"C:\GOURMET\SPOOLER\";
+            if(MessageBox.Show(this,"Atenção: alterar estes paths pode fazer o sistema parar de funcionar nos outros micros que acessam este banco pela rede. Confirme que os demais computadores podem usar os novos diretórios.\r\n\r\nOs paths serão configurados assim:\r\n\r\nPATHRECEBE_EMAIL: "+receive+"\r\nPATHENVIO_EMAIL: "+send+"\r\nPATH_SERVIDOR e PATH_ALIAS: "+databasePath+"\r\nPATHCARGA e PATHCARGACAIXA: "+sales+"\r\nPATHGERENCIADORIMP: "+spooler+"\r\n\r\nDeseja continuar?","Atenção: configuração de paths",MessageBoxButtons.YesNo,MessageBoxIcon.Warning,MessageBoxDefaultButton.Button2)!=DialogResult.Yes)return;
+            Directory.CreateDirectory(receive);Directory.CreateDirectory(send);Directory.CreateDirectory(sales);Directory.CreateDirectory(spooler);
+            Func<string,string> literal=delegate(string value){return "'"+value.Replace("'","''")+"'";};
+            string sql="UPDATE EMPRESAS SET PATHENVIO_EMAIL="+literal(send)+", PATHRECEBE_EMAIL="+literal(receive)+", PATH_SERVIDOR="+literal(databasePath)+", PATH_ALIAS="+literal(databasePath)+";\r\nUPDATE CONFIG SET PATHCARGA="+literal(sales)+", PATHCARGACAIXA="+literal(sales)+", PATHGERENCIADORIMP="+literal(spooler)+";\r\nCOMMIT;";
+            string output=RunIsql(sql,database,passBox.Text);outputBox.Text=output;if(HasSqlError(output)){ShowExecutionError("Não foi possível configurar os paths",output,"Confira se as tabelas permitem atualizar esses campos.");return;}status.Text="Paths configurados nas tabelas EMPRESAS e CONFIG.";status.ForeColor=Color.DarkGreen;MessageBox.Show(this,"Paths configurados com sucesso. As pastas fixas foram criadas quando necessário.","Paths configurados",MessageBoxButtons.OK,MessageBoxIcon.Information);
+        }catch(Exception ex){ShowExecutionError("Não foi possível configurar os paths",ex.ToString(),"Confira a conexão, o acesso às pastas e os campos das tabelas EMPRESAS e CONFIG.");}
     }
     void ToggleConnection() { if(connectionValidated){if(File.Exists(PasswordFilePath())){string currentPassword=passBox.Text;if(!LoadPasswordFromFile())return;if(!String.Equals(currentPassword,passBox.Text,StringComparison.Ordinal)){connectionValidated=false;Connect();return;}}DisconnectDatabase();}else Connect(); }
     void DisconnectDatabase() { connectionValidated=false;if(connectButton!=null)connectButton.Text="Conectar";tableNames.Clear();if(tableSuggestionPopup!=null)tableSuggestionPopup.Visible=false;SetConnectionIndicator("● Desconectado",Color.DarkRed,Color.MistyRose);if(status!=null){status.Text="Banco desconectado. Informe a senha e clique em Conectar para continuar.";status.ForeColor=Color.DimGray;} }
