@@ -14,9 +14,9 @@ using System.Windows.Forms;
 
 [assembly: System.Reflection.AssemblyTitle("Consulta SQL Firebird")]
 [assembly: System.Reflection.AssemblyProduct("Consulta SQL Firebird")]
-[assembly: System.Reflection.AssemblyVersion("0.2.40.0")]
-[assembly: System.Reflection.AssemblyFileVersion("0.2.40.0")]
-[assembly: System.Reflection.AssemblyInformationalVersion("v0.2.40")]
+[assembly: System.Reflection.AssemblyVersion("0.2.42.0")]
+[assembly: System.Reflection.AssemblyFileVersion("0.2.42.0")]
+[assembly: System.Reflection.AssemblyInformationalVersion("v0.2.42")]
 
 internal static class GeneratedFileUX {
     public static void AskOpenFolder(IWin32Window owner,string filePath,string title) {
@@ -114,7 +114,7 @@ internal sealed class BackupPasswordForm : Form {
 }
 
 internal sealed class FieldSchemaInfo { public int Type,Scale,SubType; public string CharacterSet=""; }
-internal sealed class GridColumnChoice { public DataGridViewColumn Column; public override string ToString() { string header=String.IsNullOrWhiteSpace(Column.HeaderText)?Column.Name:Column.HeaderText;return String.Equals(header,Column.Name,StringComparison.OrdinalIgnoreCase)?header:header+" ("+Column.Name+")"; } } internal sealed class SavedCellHighlight { public Dictionary<string,object> IdentityValues=new Dictionary<string,object>(StringComparer.OrdinalIgnoreCase); public HashSet<string> ChangedFields=new HashSet<string>(StringComparer.OrdinalIgnoreCase); }internal sealed class QueryResultState { public string Sql="",TableName="",DbKeyColumn=""; public DataTable Table; public DataGridView Grid,MetadataGrid; public TabPage MetadataPage; public Label MetadataHint; public bool DisplayMetadataLoading=false; public List<string> PrimaryKey=new List<string>(); public List<string> ReadOnlyColumns=new List<string>(); public Dictionary<string,int> FieldTypes=new Dictionary<string,int>(StringComparer.OrdinalIgnoreCase); public Dictionary<string,int> FieldScales=new Dictionary<string,int>(StringComparer.OrdinalIgnoreCase); public Dictionary<string,int> FieldSubTypes=new Dictionary<string,int>(StringComparer.OrdinalIgnoreCase); public Dictionary<string,string> FieldCharacterSets=new Dictionary<string,string>(StringComparer.OrdinalIgnoreCase); public bool CanEdit=false, Editing=false, MetadataLoaded=false, UseOriginalValuesAsIdentity=false, UseDbKeyIdentity=false, Duplicating=false; public DataRow DuplicateSourceRow; public Dictionary<DataRow,HashSet<string>> SavedChangedCells=new Dictionary<DataRow,HashSet<string>>(); public int SearchHighlightColumn=-1; public string QuickFilterText=""; public TextBox QuickFilterInput; public Label QuickFilterCount; public System.Windows.Forms.Timer QuickFilterTimer; public Panel QuickFilterBar; public TableLayoutPanel QuickFilterLayout; }
+internal sealed class GridColumnChoice { public DataGridViewColumn Column; public override string ToString() { string header=String.IsNullOrWhiteSpace(Column.HeaderText)?Column.Name:Column.HeaderText;return String.Equals(header,Column.Name,StringComparison.OrdinalIgnoreCase)?header:header+" ("+Column.Name+")"; } } internal sealed class SavedCellHighlight { public Dictionary<string,object> IdentityValues=new Dictionary<string,object>(StringComparer.OrdinalIgnoreCase); public HashSet<string> ChangedFields=new HashSet<string>(StringComparer.OrdinalIgnoreCase); }internal sealed class QueryResultState { public string Sql="",TableName="",DbKeyColumn=""; public DataTable Table; public DataGridView Grid; public TextBox MetadataText; public TabPage MetadataPage; public Label MetadataHint; public bool DisplayMetadataLoading=false; public List<string> PrimaryKey=new List<string>(); public List<string> ReadOnlyColumns=new List<string>(); public Dictionary<string,int> FieldTypes=new Dictionary<string,int>(StringComparer.OrdinalIgnoreCase); public Dictionary<string,int> FieldScales=new Dictionary<string,int>(StringComparer.OrdinalIgnoreCase); public Dictionary<string,int> FieldSubTypes=new Dictionary<string,int>(StringComparer.OrdinalIgnoreCase); public Dictionary<string,string> FieldCharacterSets=new Dictionary<string,string>(StringComparer.OrdinalIgnoreCase); public bool CanEdit=false, Editing=false, MetadataLoaded=false, UseOriginalValuesAsIdentity=false, UseDbKeyIdentity=false, Duplicating=false; public DataRow DuplicateSourceRow; public Dictionary<DataRow,HashSet<string>> SavedChangedCells=new Dictionary<DataRow,HashSet<string>>(); public int SearchHighlightColumn=-1; public string QuickFilterText=""; public TextBox QuickFilterInput; public Label QuickFilterCount; public System.Windows.Forms.Timer QuickFilterTimer; public Panel QuickFilterBar; public TableLayoutPanel QuickFilterLayout; }
 internal sealed class ResultDataGridView : DataGridView {
     public Action<bool,bool> NavigateHomeEnd;
     bool HandleHomeEnd(Keys keyData) {
@@ -1284,34 +1284,100 @@ internal sealed class SavedSqlEntry {
         return SqlTextLiteral(text);
     }
     string SqlIdentifier(string value) { if(Regex.IsMatch(value??"",@"^[A-Za-z][A-Za-z0-9_$]*$"))return value;return "\""+value.Replace("\"","\"\"")+"\""; }
-    string FirebirdMetadataType(int type,int subType,int scale,int characterLength,int byteLength) {
+    string FirebirdMetadataType(int type,int subType,int precision,int scale,int characterLength,int segmentLength) {
+        if(type==261)return "BLOB SUB_TYPE "+subType.ToString()+(segmentLength>0?" SEGMENT SIZE "+segmentLength.ToString():"");
+        if((type==7||type==8||type==16)&&(subType==1||subType==2)){
+            string numericType=subType==1?"NUMERIC":"DECIMAL";
+            if(precision>0)return numericType+"("+precision.ToString()+(scale<0?","+Math.Abs(scale).ToString():"")+")";
+            return numericType;
+        }
         string name;
-        switch(type){case 7:name="SMALLINT";break;case 8:name="INTEGER";break;case 9:name="QUAD";break;case 10:name="FLOAT";break;case 11:name="D_FLOAT";break;case 12:name="DATE";break;case 13:name="TIME";break;case 14:name="CHAR";break;case 16:name="BIGINT";break;case 23:name="BOOLEAN";break;case 24:name="DECFLOAT(16)";break;case 25:name="TIME WITH TIME ZONE";break;case 26:name="TIMESTAMP WITH TIME ZONE";break;case 27:name="DOUBLE PRECISION";break;case 35:name="TIMESTAMP";break;case 37:name="VARCHAR";break;case 40:name="CSTRING";break;case 261:return subType==1?"BLOB SUB_TYPE TEXT":"BLOB";default:name="TIPO "+type.ToString();break;}
+        switch(type){case 7:name="SMALLINT";break;case 8:name="INTEGER";break;case 9:name="QUAD";break;case 10:name="FLOAT";break;case 11:name="D_FLOAT";break;case 12:name="DATE";break;case 13:name="TIME";break;case 14:name="CHAR";break;case 16:name="BIGINT";break;case 23:name="BOOLEAN";break;case 24:name="DECFLOAT(16)";break;case 25:name="TIME WITH TIME ZONE";break;case 26:name="TIMESTAMP WITH TIME ZONE";break;case 27:name="DOUBLE PRECISION";break;case 35:name="TIMESTAMP";break;case 37:name="VARCHAR";break;case 40:name="CSTRING";break;default:name="TIPO "+type.ToString();break;}
         if((type==14||type==37||type==40)&&characterLength>0)return name+"("+characterLength.ToString()+")";
-        if((type==7||type==8||type==16)&&subType==1)return "NUMERIC (escala "+Math.Abs(scale).ToString()+")";
-        if((type==7||type==8||type==16)&&subType==2)return "DECIMAL (escala "+Math.Abs(scale).ToString()+")";
         return name;
     }
+    static string DdlValue(DataRow row,string column) { if(row==null||row.IsNull(column))return "";string value=Convert.ToString(row[column]).Trim();return String.Equals(value,"<null>",StringComparison.OrdinalIgnoreCase)?"":value; }
+    DataTable ReadDdlMetadata(string sql,string executable,string database,string password) {
+        string diagnostic="";DataTable result=RunSelectIsql(sql,executable,database,password,out diagnostic);
+        if(HasSqlError(diagnostic))throw new InvalidOperationException(diagnostic);
+        return result;
+    }
+    string TriggerDdlEvent(int type) {
+        switch(type){case 1:return "BEFORE INSERT";case 2:return "AFTER INSERT";case 3:return "BEFORE UPDATE";case 4:return "AFTER UPDATE";case 5:return "BEFORE DELETE";case 6:return "AFTER DELETE";case 17:return "BEFORE INSERT OR UPDATE";case 18:return "AFTER INSERT OR UPDATE";case 25:return "BEFORE INSERT OR DELETE";case 26:return "AFTER INSERT OR DELETE";case 27:return "BEFORE UPDATE OR DELETE";case 28:return "AFTER UPDATE OR DELETE";case 113:return "BEFORE INSERT OR UPDATE OR DELETE";case 114:return "AFTER INSERT OR UPDATE OR DELETE";default:return "";}
+    }
+    List<string> BuildKeyConstraintDdl(DataTable rows) {
+        var output=new List<string>();string currentName="",currentType="";var fields=new List<string>();
+        Action flush=delegate{if(fields.Count>0)output.Add("CONSTRAINT "+SqlIdentifier(currentName)+" "+currentType+" ("+String.Join(", ",fields.ToArray())+")");fields.Clear();};
+        foreach(DataRow row in rows.Rows){string name=DdlValue(row,"CONSTRAINT_NAME"),type=DdlValue(row,"CONSTRAINT_TYPE"),field=DdlValue(row,"FIELD_NAME");if(name.Length==0||field.Length==0)continue;if(currentName.Length>0&&!String.Equals(currentName,name,StringComparison.OrdinalIgnoreCase))flush();if(fields.Count==0){currentName=name;currentType=type;}fields.Add(SqlIdentifier(field));}flush();return output;
+    }
+    List<string> BuildForeignKeyDdl(DataTable rows) {
+        var output=new List<string>();string currentName="",parentTable="",updateRule="",deleteRule="";var sourceFields=new List<string>();var targetFields=new List<string>();
+        Action flush=delegate{if(sourceFields.Count==0)return;var clause=new StringBuilder("CONSTRAINT ").Append(SqlIdentifier(currentName)).Append(" FOREIGN KEY (").Append(String.Join(", ",sourceFields.ToArray())).Append(") REFERENCES ").Append(SqlIdentifier(parentTable)).Append(" (").Append(String.Join(", ",targetFields.ToArray())).Append(")");if(updateRule.Length>0&&updateRule!="RESTRICT")clause.Append(" ON UPDATE ").Append(updateRule);if(deleteRule.Length>0&&deleteRule!="RESTRICT")clause.Append(" ON DELETE ").Append(deleteRule);output.Add(clause.ToString());sourceFields.Clear();targetFields.Clear();};
+        foreach(DataRow row in rows.Rows){string name=DdlValue(row,"CONSTRAINT_NAME");if(name.Length==0)continue;if(currentName.Length>0&&!String.Equals(currentName,name,StringComparison.OrdinalIgnoreCase))flush();if(sourceFields.Count==0){currentName=name;parentTable=DdlValue(row,"PARENT_TABLE");updateRule=DdlValue(row,"UPDATE_RULE");deleteRule=DdlValue(row,"DELETE_RULE");}sourceFields.Add(SqlIdentifier(DdlValue(row,"FIELD_NAME")));targetFields.Add(SqlIdentifier(DdlValue(row,"PARENT_FIELD")));}flush();return output;
+    }
+    string BuildTableDdl(string relation,string executable,string database,string password) {
+        relation=(relation??"").Trim();
+        if(relation.Length>=2&&relation[0]=='"'&&relation[relation.Length-1]=='"')
+            relation=relation.Substring(1,relation.Length-2).Replace("\"\"", "\"");
+        string safeRelation=relation.Replace("'","''");
+        string relationSql="SELECT TRIM(R.RDB$RELATION_NAME) AS RELATION_NAME, TRIM(R.RDB$OWNER_NAME) AS OWNER_NAME, TRIM(R.RDB$DESCRIPTION) AS TABLE_DESCRIPTION FROM RDB$RELATIONS R WHERE R.RDB$RELATION_NAME='"+safeRelation+"' OR UPPER(R.RDB$RELATION_NAME)=UPPER('"+safeRelation+"') ORDER BY CASE WHEN R.RDB$RELATION_NAME='"+safeRelation+"' THEN 0 ELSE 1 END;";
+        DataTable ownerRows=ReadDdlMetadata(relationSql,executable,database,password);
+        if(ownerRows.Rows.Count==0)throw new InvalidOperationException("A tabela "+relation+" não foi encontrada no catálogo do Firebird.");
+        relation=DdlValue(ownerRows.Rows[0],"RELATION_NAME");safeRelation=relation.Replace("'","''");string quotedRelation=SqlIdentifier(relation);
+        string owner=DdlValue(ownerRows.Rows[0],"OWNER_NAME"),tableDescription=DdlValue(ownerRows.Rows[0],"TABLE_DESCRIPTION");
+        string fieldSql="SELECT RF.RDB$FIELD_POSITION AS FIELD_POSITION, TRIM(RF.RDB$FIELD_NAME) AS FIELD_NAME, F.RDB$FIELD_TYPE AS FIELD_TYPE, COALESCE(F.RDB$FIELD_SUB_TYPE,0) AS FIELD_SUB_TYPE, COALESCE(F.RDB$FIELD_LENGTH,0) AS FIELD_LENGTH, COALESCE(F.RDB$FIELD_SCALE,0) AS FIELD_SCALE, COALESCE(F.RDB$FIELD_PRECISION,0) AS FIELD_PRECISION, COALESCE(F.RDB$CHARACTER_LENGTH,0) AS CHAR_LEN, COALESCE(F.RDB$SEGMENT_LENGTH,0) AS SEGMENT_LENGTH, COALESCE(RF.RDB$NULL_FLAG,F.RDB$NULL_FLAG,0) AS NOT_NULL, TRIM(RF.RDB$DEFAULT_SOURCE) AS COLUMN_DEFAULT, TRIM(F.RDB$DEFAULT_SOURCE) AS DOMAIN_DEFAULT, TRIM(F.RDB$COMPUTED_SOURCE) AS COMPUTED_SOURCE, TRIM(RF.RDB$DESCRIPTION) AS COLUMN_DESCRIPTION, TRIM(CS.RDB$CHARACTER_SET_NAME) AS CHARSET_NAME FROM RDB$RELATION_FIELDS RF JOIN RDB$FIELDS F ON F.RDB$FIELD_NAME=RF.RDB$FIELD_SOURCE LEFT JOIN RDB$CHARACTER_SETS CS ON CS.RDB$CHARACTER_SET_ID=F.RDB$CHARACTER_SET_ID WHERE RF.RDB$RELATION_NAME='"+safeRelation+"' ORDER BY RF.RDB$FIELD_POSITION;";
+        DataTable fieldRows=ReadDdlMetadata(fieldSql,executable,database,password);if(fieldRows.Rows.Count==0)throw new InvalidOperationException("O Firebird não retornou campos para a tabela "+relation+".");
+        string keySql="SELECT TRIM(C.RDB$CONSTRAINT_NAME) AS CONSTRAINT_NAME, TRIM(C.RDB$CONSTRAINT_TYPE) AS CONSTRAINT_TYPE, TRIM(S.RDB$FIELD_NAME) AS FIELD_NAME, S.RDB$FIELD_POSITION AS FIELD_POSITION FROM RDB$RELATION_CONSTRAINTS C JOIN RDB$INDEX_SEGMENTS S ON S.RDB$INDEX_NAME=C.RDB$INDEX_NAME WHERE C.RDB$RELATION_NAME='"+safeRelation+"' AND C.RDB$CONSTRAINT_TYPE IN ('PRIMARY KEY','UNIQUE') ORDER BY C.RDB$CONSTRAINT_NAME,S.RDB$FIELD_POSITION;";
+        DataTable keyRows=ReadDdlMetadata(keySql,executable,database,password);
+        string foreignSql="SELECT TRIM(C.RDB$CONSTRAINT_NAME) AS CONSTRAINT_NAME, TRIM(S.RDB$FIELD_NAME) AS FIELD_NAME, TRIM(U.RDB$RELATION_NAME) AS PARENT_TABLE, TRIM(US.RDB$FIELD_NAME) AS PARENT_FIELD, TRIM(RC.RDB$UPDATE_RULE) AS UPDATE_RULE, TRIM(RC.RDB$DELETE_RULE) AS DELETE_RULE, S.RDB$FIELD_POSITION AS FIELD_POSITION FROM RDB$RELATION_CONSTRAINTS C JOIN RDB$REF_CONSTRAINTS RC ON RC.RDB$CONSTRAINT_NAME=C.RDB$CONSTRAINT_NAME JOIN RDB$RELATION_CONSTRAINTS U ON U.RDB$CONSTRAINT_NAME=RC.RDB$CONST_NAME_UQ JOIN RDB$INDEX_SEGMENTS S ON S.RDB$INDEX_NAME=C.RDB$INDEX_NAME JOIN RDB$INDEX_SEGMENTS US ON US.RDB$INDEX_NAME=U.RDB$INDEX_NAME AND US.RDB$FIELD_POSITION=S.RDB$FIELD_POSITION WHERE C.RDB$RELATION_NAME='"+safeRelation+"' AND C.RDB$CONSTRAINT_TYPE='FOREIGN KEY' ORDER BY C.RDB$CONSTRAINT_NAME,S.RDB$FIELD_POSITION;";
+        DataTable foreignRows=ReadDdlMetadata(foreignSql,executable,database,password);
+        string checkSql="SELECT TRIM(C.RDB$CONSTRAINT_NAME) AS CONSTRAINT_NAME, TRIM(T.RDB$TRIGGER_SOURCE) AS CHECK_SOURCE FROM RDB$RELATION_CONSTRAINTS C JOIN RDB$CHECK_CONSTRAINTS CC ON CC.RDB$CONSTRAINT_NAME=C.RDB$CONSTRAINT_NAME JOIN RDB$TRIGGERS T ON T.RDB$TRIGGER_NAME=CC.RDB$TRIGGER_NAME WHERE C.RDB$RELATION_NAME='"+safeRelation+"' AND C.RDB$CONSTRAINT_TYPE='CHECK' ORDER BY C.RDB$CONSTRAINT_NAME;";
+        DataTable checkRows=ReadDdlMetadata(checkSql,executable,database,password);
+        string indexSql="SELECT TRIM(I.RDB$INDEX_NAME) AS INDEX_NAME, COALESCE(I.RDB$UNIQUE_FLAG,0) AS UNIQUE_FLAG, COALESCE(I.RDB$INDEX_INACTIVE,0) AS INACTIVE_FLAG, COALESCE(I.RDB$INDEX_TYPE,0) AS INDEX_TYPE, TRIM(S.RDB$FIELD_NAME) AS FIELD_NAME, S.RDB$FIELD_POSITION AS FIELD_POSITION, TRIM(I.RDB$EXPRESSION_SOURCE) AS EXPRESSION_SOURCE FROM RDB$INDICES I LEFT JOIN RDB$INDEX_SEGMENTS S ON S.RDB$INDEX_NAME=I.RDB$INDEX_NAME LEFT JOIN RDB$RELATION_CONSTRAINTS C ON C.RDB$INDEX_NAME=I.RDB$INDEX_NAME WHERE I.RDB$RELATION_NAME='"+safeRelation+"' AND COALESCE(I.RDB$SYSTEM_FLAG,0)=0 AND C.RDB$CONSTRAINT_NAME IS NULL ORDER BY I.RDB$INDEX_NAME,S.RDB$FIELD_POSITION;";
+        DataTable indexRows=ReadDdlMetadata(indexSql,executable,database,password);
+        string triggerSql="SELECT TRIM(RDB$TRIGGER_NAME) AS TRIGGER_NAME, RDB$TRIGGER_TYPE AS TRIGGER_TYPE, COALESCE(RDB$TRIGGER_SEQUENCE,0) AS TRIGGER_SEQUENCE, COALESCE(RDB$TRIGGER_INACTIVE,0) AS TRIGGER_INACTIVE, TRIM(RDB$TRIGGER_SOURCE) AS TRIGGER_SOURCE FROM RDB$TRIGGERS WHERE RDB$RELATION_NAME='"+safeRelation+"' AND COALESCE(RDB$SYSTEM_FLAG,0)=0 ORDER BY RDB$TRIGGER_SEQUENCE,RDB$TRIGGER_NAME;";
+        DataTable triggerRows=ReadDdlMetadata(triggerSql,executable,database,password);
+        var columnNames=new List<string>();var columnDefinitions=new List<string>();var definitions=new List<string>();var comments=new List<string>();
+        foreach(DataRow row in fieldRows.Rows){
+            string field=DdlValue(row,"FIELD_NAME"),defaultSource=DdlValue(row,"COLUMN_DEFAULT");if(defaultSource.Length==0)defaultSource=DdlValue(row,"DOMAIN_DEFAULT");
+            int type=0,subType=0,precision=0,scale=0,charLength=0,segmentLength=0,fieldLength=0,notNull=0;int.TryParse(DdlValue(row,"FIELD_TYPE"),out type);int.TryParse(DdlValue(row,"FIELD_SUB_TYPE"),out subType);int.TryParse(DdlValue(row,"FIELD_PRECISION"),out precision);int.TryParse(DdlValue(row,"FIELD_SCALE"),out scale);int.TryParse(DdlValue(row,"CHAR_LEN"),out charLength);int.TryParse(DdlValue(row,"SEGMENT_LENGTH"),out segmentLength);int.TryParse(DdlValue(row,"FIELD_LENGTH"),out fieldLength);int.TryParse(DdlValue(row,"NOT_NULL"),out notNull);
+            string charset=DdlValue(row,"CHARSET_NAME"),computed=DdlValue(row,"COMPUTED_SOURCE");
+            var definition=new StringBuilder();
+            if(computed.Length>0)definition.Append("COMPUTED BY (").Append(computed).Append(")");
+            else definition.Append(FirebirdMetadataType(type,subType,precision,scale,charLength,segmentLength));
+            if(charset.Length>0&&!String.Equals(charset,"NONE",StringComparison.OrdinalIgnoreCase)&&((type==14)||(type==37)||(type==40)||(type==261&&subType==1)))definition.Append(" CHARACTER SET ").Append(SqlIdentifier(charset));
+            if(computed.Length==0&&defaultSource.Length>0)definition.Append(" ").Append(defaultSource);
+            if(computed.Length==0&&notNull!=0)definition.Append(" NOT NULL");
+            columnNames.Add(SqlIdentifier(field));columnDefinitions.Add(definition.ToString());
+            string description=DdlValue(row,"COLUMN_DESCRIPTION");if(description.Length>0)comments.Add("COMMENT ON COLUMN "+quotedRelation+"."+SqlIdentifier(field)+" IS '"+description.Replace("'","''")+"';");
+        }
+        definitions.AddRange(BuildKeyConstraintDdl(keyRows));definitions.AddRange(BuildForeignKeyDdl(foreignRows));
+        foreach(DataRow row in checkRows.Rows){string name=DdlValue(row,"CONSTRAINT_NAME"),source=DdlValue(row,"CHECK_SOURCE");if(name.Length==0||source.Length==0)continue;Match match=Regex.Match(source,@"^\s*CHECK\s*\((?<expression>[\s\S]*)\)\s*;?\s*$",RegexOptions.IgnoreCase);if(match.Success)definitions.Add("CONSTRAINT "+SqlIdentifier(name)+" CHECK ("+match.Groups["expression"].Value.Trim()+")");else comments.Add("-- CHECK constraint "+name+": "+Regex.Replace(source,@"\s+"," ").Trim());}
+        var ddl=new StringBuilder();ddl.Append("/* Table: ").Append(relation).Append(", Owner: ").Append(owner).AppendLine(" */").AppendLine();
+        ddl.Append("CREATE TABLE ").Append(quotedRelation).AppendLine().AppendLine("(");
+        int columnNameWidth=0;foreach(string columnName in columnNames)columnNameWidth=Math.Max(columnNameWidth,columnName.Length);
+        for(int i=0;i<columnNames.Count;i++)definitions.Insert(i,"  "+columnNames[i].PadRight(columnNameWidth)+"  "+columnDefinitions[i]);
+        for(int i=0;i<definitions.Count;i++)ddl.Append(definitions[i]).AppendLine(i<definitions.Count-1?",":"");
+        ddl.AppendLine(");").AppendLine();
+        if(tableDescription.Length>0)ddl.Append("COMMENT ON TABLE ").Append(quotedRelation).Append(" IS '").Append(tableDescription.Replace("'","''")).AppendLine("';");
+        foreach(string comment in comments)ddl.AppendLine(comment);
+        if(tableDescription.Length>0||comments.Count>0)ddl.AppendLine();
+        var indexOrder=new List<string>();var indexFields=new Dictionary<string,List<string>>(StringComparer.OrdinalIgnoreCase);var indexExpressions=new Dictionary<string,string>(StringComparer.OrdinalIgnoreCase);var indexUnique=new Dictionary<string,bool>(StringComparer.OrdinalIgnoreCase);var indexInactive=new Dictionary<string,bool>(StringComparer.OrdinalIgnoreCase);var indexDescending=new Dictionary<string,bool>(StringComparer.OrdinalIgnoreCase);
+        foreach(DataRow row in indexRows.Rows){string name=DdlValue(row,"INDEX_NAME");if(name.Length==0)continue;if(!indexFields.ContainsKey(name)){indexOrder.Add(name);indexFields[name]=new List<string>();int flag=0;int.TryParse(DdlValue(row,"UNIQUE_FLAG"),out flag);indexUnique[name]=flag!=0;int.TryParse(DdlValue(row,"INACTIVE_FLAG"),out flag);indexInactive[name]=flag!=0;int.TryParse(DdlValue(row,"INDEX_TYPE"),out flag);indexDescending[name]=flag!=0;}string expression=DdlValue(row,"EXPRESSION_SOURCE");if(expression.Length>0)indexExpressions[name]=expression;string field=DdlValue(row,"FIELD_NAME");if(field.Length>0&&!indexFields[name].Contains(SqlIdentifier(field)))indexFields[name].Add(SqlIdentifier(field));}
+        if(indexOrder.Count>0){ddl.Append("/* Index definitions for ").Append(relation).AppendLine(" */");foreach(string name in indexOrder){string columns;string expression;if(indexExpressions.TryGetValue(name,out expression)&&expression.Length>0)columns="("+expression+")";else if(indexFields[name].Count>0)columns="("+String.Join(", ",indexFields[name].ToArray())+")";else{ddl.AppendLine("-- Index "+name+" could not be reconstructed from the stored metadata.");continue;}ddl.Append("CREATE ");if(indexUnique[name])ddl.Append("UNIQUE ");if(indexDescending[name])ddl.Append("DESCENDING ");ddl.Append("INDEX ").Append(SqlIdentifier(name)).Append(" ON ").Append(quotedRelation).Append(" ").Append(columns);if(indexInactive[name])ddl.Append(" INACTIVE");ddl.AppendLine(";");}ddl.AppendLine();}
+        if(triggerRows.Rows.Count>0){ddl.AppendLine("SET TERM ^ ;");foreach(DataRow row in triggerRows.Rows){string name=DdlValue(row,"TRIGGER_NAME"),source=DdlValue(row,"TRIGGER_SOURCE");int type=0,sequence=0,inactive=0;int.TryParse(DdlValue(row,"TRIGGER_TYPE"),out type);int.TryParse(DdlValue(row,"TRIGGER_SEQUENCE"),out sequence);int.TryParse(DdlValue(row,"TRIGGER_INACTIVE"),out inactive);string eventText=TriggerDdlEvent(type);if(eventText.Length==0){ddl.Append("-- Trigger ").Append(name).Append(" omitted: unsupported event type ").Append(type.ToString()).AppendLine(".");continue;}ddl.Append("CREATE TRIGGER ").Append(SqlIdentifier(name)).Append(" FOR ").Append(quotedRelation).Append(" ").Append(inactive==0?"ACTIVE":"INACTIVE").Append(" ").Append(eventText).Append(" POSITION ").Append(sequence.ToString()).AppendLine();ddl.AppendLine(source.Trim());ddl.AppendLine("^");}ddl.AppendLine("SET TERM ;^").AppendLine();}
+        ddl.AppendLine("COMMIT WORK;");
+        return ddl.ToString();
+    }
     async void LoadResultMetadata(QueryResultState state) {
-        if(state==null||state.MetadataGrid==null||state.MetadataHint==null)return;
-        if(String.IsNullOrWhiteSpace(state.TableName)){state.MetadataGrid.DataSource=null;state.MetadataHint.Text="Este resultado não corresponde diretamente a uma tabela.";return;}
+        if(state==null||state.MetadataText==null||state.MetadataHint==null)return;
+        if(String.IsNullOrWhiteSpace(state.TableName)){state.MetadataText.Clear();state.MetadataHint.Text="Este resultado não corresponde diretamente a uma tabela.";return;}
         if(state.DisplayMetadataLoading)return;
-        string relation=state.TableName.Replace("'","''");
-        state.DisplayMetadataLoading=true;state.MetadataGrid.DataSource=null;state.MetadataHint.Text="Lendo metadados de "+state.TableName+"...";
-        try{
-            string sql="SELECT RF.RDB$FIELD_POSITION AS FIELD_POSITION, TRIM(RF.RDB$FIELD_NAME) AS FIELD_NAME, F.RDB$FIELD_TYPE AS FIELD_TYPE, COALESCE(F.RDB$FIELD_SUB_TYPE,0) AS FIELD_SUB_TYPE, COALESCE(F.RDB$FIELD_LENGTH,0) AS FIELD_LENGTH, COALESCE(F.RDB$FIELD_SCALE,0) AS FIELD_SCALE, COALESCE(F.RDB$CHARACTER_LENGTH,0) AS CHARACTER_LENGTH, COALESCE(RF.RDB$NULL_FLAG,F.RDB$NULL_FLAG,0) AS NOT_NULL, TRIM(RF.RDB$DEFAULT_SOURCE) AS DEFAULT_SOURCE, TRIM(RF.RDB$COMPUTED_SOURCE) AS COMPUTED_SOURCE, TRIM(RF.RDB$DESCRIPTION) AS DESCRIPTION, TRIM(CS.RDB$CHARACTER_SET_NAME) AS CHARSET_NAME, CASE WHEN EXISTS (SELECT 1 FROM RDB$RELATION_CONSTRAINTS C JOIN RDB$INDEX_SEGMENTS S ON S.RDB$INDEX_NAME=C.RDB$INDEX_NAME WHERE C.RDB$RELATION_NAME=RF.RDB$RELATION_NAME AND C.RDB$CONSTRAINT_TYPE='PRIMARY KEY' AND S.RDB$FIELD_NAME=RF.RDB$FIELD_NAME) THEN 'SIM' ELSE '' END AS PRIMARY_KEY FROM RDB$RELATION_FIELDS RF JOIN RDB$FIELDS F ON F.RDB$FIELD_NAME=RF.RDB$FIELD_SOURCE LEFT JOIN RDB$CHARACTER_SETS CS ON CS.RDB$CHARACTER_SET_ID=F.RDB$CHARACTER_SET_ID WHERE RF.RDB$RELATION_NAME='"+relation+"' ORDER BY RF.RDB$FIELD_POSITION;";
-            string executable=IsqlPath(),database=dbBox.Text.Trim(),password=passBox.Text,diagnostic="";
-            if(String.IsNullOrWhiteSpace(executable))throw new InvalidOperationException("Não foi localizado o isql.exe.");
-            DataTable raw=await Task.Run(delegate{return RunSelectIsql(sql,executable,database,password,out diagnostic);});
-            if(IsDisposed)return;
-            if(HasSqlError(diagnostic))throw new InvalidOperationException(diagnostic);
-            var display=new DataTable();display.Columns.Add("POSIÇÃO");display.Columns.Add("CAMPO");display.Columns.Add("TIPO");display.Columns.Add("TAMANHO");display.Columns.Add("ESCALA");display.Columns.Add("NULO");display.Columns.Add("PADRÃO");display.Columns.Add("CHAVE PRIMÁRIA");display.Columns.Add("COMPUTADA");display.Columns.Add("DESCRIÇÃO");display.Columns.Add("CHARSET");
-            foreach(DataRow row in raw.Rows){
-                int position=0,type=0,subType=0,scale=0,charLength=0,byteLength=0,notNull=0;int.TryParse(Convert.ToString(row["FIELD_POSITION"]),out position);int.TryParse(Convert.ToString(row["FIELD_TYPE"]),out type);int.TryParse(Convert.ToString(row["FIELD_SUB_TYPE"]),out subType);int.TryParse(Convert.ToString(row["FIELD_SCALE"]),out scale);int.TryParse(Convert.ToString(row["CHARACTER_LENGTH"]),out charLength);int.TryParse(Convert.ToString(row["FIELD_LENGTH"]),out byteLength);int.TryParse(Convert.ToString(row["NOT_NULL"]),out notNull);
-                display.Rows.Add(position+1,Convert.ToString(row["FIELD_NAME"]).Trim(),FirebirdMetadataType(type,subType,scale,charLength,byteLength),byteLength>0?byteLength.ToString():"",scale<0?Math.Abs(scale).ToString():"",notNull!=0?"NÃO":"SIM",Convert.ToString(row["DEFAULT_SOURCE"]).Trim(),Convert.ToString(row["PRIMARY_KEY"]).Trim(),String.IsNullOrWhiteSpace(Convert.ToString(row["COMPUTED_SOURCE"]))?"NÃO":"SIM",Convert.ToString(row["DESCRIPTION"]).Trim(),Convert.ToString(row["CHARSET_NAME"]).Trim());
-            }
-            state.MetadataGrid.DataSource=display;state.MetadataHint.Text=state.TableName+" — "+Quantity(display.Rows.Count,"campo","campos")+"; tamanhos em bytes.";
-        }catch(Exception ex){if(!IsDisposed)state.MetadataHint.Text="Não foi possível carregar o metadata: "+ex.Message;}
+        string executable=IsqlPath(),database=dbBox.Text.Trim(),password=passBox.Text;
+        if(String.IsNullOrWhiteSpace(executable)){state.MetadataHint.Text="Não foi localizado o isql.exe.";return;}
+        state.DisplayMetadataLoading=true;state.MetadataText.Clear();state.MetadataHint.Text="Gerando DDL de "+state.TableName+"...";
+        try{string ddl=await Task.Run(delegate{return BuildTableDdl(state.TableName,executable,database,password);});if(IsDisposed)return;state.MetadataText.Text=ddl;state.MetadataHint.Text="DDL da tabela "+state.TableName+" — campos, restrições, índices e triggers.";}
+        catch(Exception ex){if(!IsDisposed)state.MetadataHint.Text="Não foi possível gerar o DDL: "+ex.Message;}
         finally{state.DisplayMetadataLoading=false;}
     }
     async Task LoadDisplayFieldScales(QueryResultState state,string executable,string database,string password) {
@@ -1533,9 +1599,9 @@ internal sealed class SavedSqlEntry {
         var page=new TabPage(number.ToString()+" - Metadados"){Tag=state};
         var layout=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=2,Padding=new Padding(8)};
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));layout.RowStyles.Add(new RowStyle(SizeType.Percent,100));
-        state.MetadataHint=new Label{Text="Selecione para consultar a estrutura de "+state.TableName+".",AutoSize=true,Padding=new Padding(2,2,2,8),ForeColor=Color.DimGray};
-        state.MetadataGrid=new DataGridView{Dock=DockStyle.Fill,ReadOnly=true,AllowUserToAddRows=false,AllowUserToDeleteRows=false,AutoGenerateColumns=true,AutoSizeColumnsMode=DataGridViewAutoSizeColumnsMode.DisplayedCells,BackgroundColor=Color.FromArgb(236,238,240),GridColor=Color.FromArgb(201,206,211),EnableHeadersVisualStyles=false,RowHeadersVisible=false,SelectionMode=DataGridViewSelectionMode.FullRowSelect,DefaultCellStyle=new DataGridViewCellStyle{BackColor=Color.FromArgb(236,238,240),ForeColor=Color.FromArgb(35,41,48)},AlternatingRowsDefaultCellStyle=new DataGridViewCellStyle{BackColor=Color.FromArgb(220,224,228)}};
-        layout.Controls.Add(state.MetadataHint,0,0);layout.Controls.Add(state.MetadataGrid,0,1);page.Controls.Add(layout);state.MetadataPage=page;return page;
+        state.MetadataHint=new Label{Text="Selecione para gerar o DDL de "+state.TableName+".",AutoSize=true,Padding=new Padding(2,2,2,8),ForeColor=Color.DimGray};
+        state.MetadataText=new TextBox{Dock=DockStyle.Fill,Multiline=true,ReadOnly=true,AcceptsReturn=true,AcceptsTab=true,ShortcutsEnabled=true,ScrollBars=ScrollBars.Both,WordWrap=false,Font=new Font("Consolas",9),BackColor=Color.FromArgb(239,241,243),ForeColor=Color.FromArgb(35,41,48)};
+        layout.Controls.Add(state.MetadataHint,0,0);layout.Controls.Add(state.MetadataText,0,1);page.Controls.Add(layout);state.MetadataPage=page;return page;
     }
     void AddResultPage(string sql,DataTable table,int number) {
         if(dataTabs.TabPages.Count==1&&dataTabs.TabPages[0].Tag==null)dataTabs.TabPages.Clear();
