@@ -14,9 +14,9 @@ using System.Windows.Forms;
 
 [assembly: System.Reflection.AssemblyTitle("Consulta SQL Firebird")]
 [assembly: System.Reflection.AssemblyProduct("Consulta SQL Firebird")]
-[assembly: System.Reflection.AssemblyVersion("0.2.39.0")]
-[assembly: System.Reflection.AssemblyFileVersion("0.2.39.0")]
-[assembly: System.Reflection.AssemblyInformationalVersion("v0.2.39")]
+[assembly: System.Reflection.AssemblyVersion("0.2.40.0")]
+[assembly: System.Reflection.AssemblyFileVersion("0.2.40.0")]
+[assembly: System.Reflection.AssemblyInformationalVersion("v0.2.40")]
 
 internal static class GeneratedFileUX {
     public static void AskOpenFolder(IWin32Window owner,string filePath,string title) {
@@ -1299,7 +1299,7 @@ internal sealed class SavedSqlEntry {
         string relation=state.TableName.Replace("'","''");
         state.DisplayMetadataLoading=true;state.MetadataGrid.DataSource=null;state.MetadataHint.Text="Lendo metadados de "+state.TableName+"...";
         try{
-            string sql="SELECT RF.RDB$FIELD_POSITION AS POSITION, TRIM(RF.RDB$FIELD_NAME) AS FIELD_NAME, F.RDB$FIELD_TYPE AS FIELD_TYPE, COALESCE(F.RDB$FIELD_SUB_TYPE,0) AS FIELD_SUB_TYPE, COALESCE(F.RDB$FIELD_LENGTH,0) AS FIELD_LENGTH, COALESCE(F.RDB$FIELD_SCALE,0) AS FIELD_SCALE, COALESCE(F.RDB$CHARACTER_LENGTH,0) AS CHARACTER_LENGTH, COALESCE(RF.RDB$NULL_FLAG,F.RDB$NULL_FLAG,0) AS NOT_NULL, TRIM(RF.RDB$DEFAULT_SOURCE) AS DEFAULT_SOURCE, TRIM(RF.RDB$COMPUTED_SOURCE) AS COMPUTED_SOURCE, TRIM(RF.RDB$DESCRIPTION) AS DESCRIPTION, TRIM(CS.RDB$CHARACTER_SET_NAME) AS CHARSET_NAME, CASE WHEN EXISTS (SELECT 1 FROM RDB$RELATION_CONSTRAINTS C JOIN RDB$INDEX_SEGMENTS S ON S.RDB$INDEX_NAME=C.RDB$INDEX_NAME WHERE C.RDB$RELATION_NAME=RF.RDB$RELATION_NAME AND C.RDB$CONSTRAINT_TYPE='PRIMARY KEY' AND S.RDB$FIELD_NAME=RF.RDB$FIELD_NAME) THEN 'SIM' ELSE '' END AS PRIMARY_KEY FROM RDB$RELATION_FIELDS RF JOIN RDB$FIELDS F ON F.RDB$FIELD_NAME=RF.RDB$FIELD_SOURCE LEFT JOIN RDB$CHARACTER_SETS CS ON CS.RDB$CHARACTER_SET_ID=F.RDB$CHARACTER_SET_ID WHERE RF.RDB$RELATION_NAME='"+relation+"' ORDER BY RF.RDB$FIELD_POSITION;";
+            string sql="SELECT RF.RDB$FIELD_POSITION AS FIELD_POSITION, TRIM(RF.RDB$FIELD_NAME) AS FIELD_NAME, F.RDB$FIELD_TYPE AS FIELD_TYPE, COALESCE(F.RDB$FIELD_SUB_TYPE,0) AS FIELD_SUB_TYPE, COALESCE(F.RDB$FIELD_LENGTH,0) AS FIELD_LENGTH, COALESCE(F.RDB$FIELD_SCALE,0) AS FIELD_SCALE, COALESCE(F.RDB$CHARACTER_LENGTH,0) AS CHARACTER_LENGTH, COALESCE(RF.RDB$NULL_FLAG,F.RDB$NULL_FLAG,0) AS NOT_NULL, TRIM(RF.RDB$DEFAULT_SOURCE) AS DEFAULT_SOURCE, TRIM(RF.RDB$COMPUTED_SOURCE) AS COMPUTED_SOURCE, TRIM(RF.RDB$DESCRIPTION) AS DESCRIPTION, TRIM(CS.RDB$CHARACTER_SET_NAME) AS CHARSET_NAME, CASE WHEN EXISTS (SELECT 1 FROM RDB$RELATION_CONSTRAINTS C JOIN RDB$INDEX_SEGMENTS S ON S.RDB$INDEX_NAME=C.RDB$INDEX_NAME WHERE C.RDB$RELATION_NAME=RF.RDB$RELATION_NAME AND C.RDB$CONSTRAINT_TYPE='PRIMARY KEY' AND S.RDB$FIELD_NAME=RF.RDB$FIELD_NAME) THEN 'SIM' ELSE '' END AS PRIMARY_KEY FROM RDB$RELATION_FIELDS RF JOIN RDB$FIELDS F ON F.RDB$FIELD_NAME=RF.RDB$FIELD_SOURCE LEFT JOIN RDB$CHARACTER_SETS CS ON CS.RDB$CHARACTER_SET_ID=F.RDB$CHARACTER_SET_ID WHERE RF.RDB$RELATION_NAME='"+relation+"' ORDER BY RF.RDB$FIELD_POSITION;";
             string executable=IsqlPath(),database=dbBox.Text.Trim(),password=passBox.Text,diagnostic="";
             if(String.IsNullOrWhiteSpace(executable))throw new InvalidOperationException("Não foi localizado o isql.exe.");
             DataTable raw=await Task.Run(delegate{return RunSelectIsql(sql,executable,database,password,out diagnostic);});
@@ -1307,7 +1307,7 @@ internal sealed class SavedSqlEntry {
             if(HasSqlError(diagnostic))throw new InvalidOperationException(diagnostic);
             var display=new DataTable();display.Columns.Add("POSIÇÃO");display.Columns.Add("CAMPO");display.Columns.Add("TIPO");display.Columns.Add("TAMANHO");display.Columns.Add("ESCALA");display.Columns.Add("NULO");display.Columns.Add("PADRÃO");display.Columns.Add("CHAVE PRIMÁRIA");display.Columns.Add("COMPUTADA");display.Columns.Add("DESCRIÇÃO");display.Columns.Add("CHARSET");
             foreach(DataRow row in raw.Rows){
-                int position=0,type=0,subType=0,scale=0,charLength=0,byteLength=0,notNull=0;int.TryParse(Convert.ToString(row["POSITION"]),out position);int.TryParse(Convert.ToString(row["FIELD_TYPE"]),out type);int.TryParse(Convert.ToString(row["FIELD_SUB_TYPE"]),out subType);int.TryParse(Convert.ToString(row["FIELD_SCALE"]),out scale);int.TryParse(Convert.ToString(row["CHARACTER_LENGTH"]),out charLength);int.TryParse(Convert.ToString(row["FIELD_LENGTH"]),out byteLength);int.TryParse(Convert.ToString(row["NOT_NULL"]),out notNull);
+                int position=0,type=0,subType=0,scale=0,charLength=0,byteLength=0,notNull=0;int.TryParse(Convert.ToString(row["FIELD_POSITION"]),out position);int.TryParse(Convert.ToString(row["FIELD_TYPE"]),out type);int.TryParse(Convert.ToString(row["FIELD_SUB_TYPE"]),out subType);int.TryParse(Convert.ToString(row["FIELD_SCALE"]),out scale);int.TryParse(Convert.ToString(row["CHARACTER_LENGTH"]),out charLength);int.TryParse(Convert.ToString(row["FIELD_LENGTH"]),out byteLength);int.TryParse(Convert.ToString(row["NOT_NULL"]),out notNull);
                 display.Rows.Add(position+1,Convert.ToString(row["FIELD_NAME"]).Trim(),FirebirdMetadataType(type,subType,scale,charLength,byteLength),byteLength>0?byteLength.ToString():"",scale<0?Math.Abs(scale).ToString():"",notNull!=0?"NÃO":"SIM",Convert.ToString(row["DEFAULT_SOURCE"]).Trim(),Convert.ToString(row["PRIMARY_KEY"]).Trim(),String.IsNullOrWhiteSpace(Convert.ToString(row["COMPUTED_SOURCE"]))?"NÃO":"SIM",Convert.ToString(row["DESCRIPTION"]).Trim(),Convert.ToString(row["CHARSET_NAME"]).Trim());
             }
             state.MetadataGrid.DataSource=display;state.MetadataHint.Text=state.TableName+" — "+Quantity(display.Rows.Count,"campo","campos")+"; tamanhos em bytes.";
