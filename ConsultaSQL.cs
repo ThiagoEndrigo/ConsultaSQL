@@ -14,9 +14,9 @@ using System.Windows.Forms;
 
 [assembly: System.Reflection.AssemblyTitle("Consulta SQL Firebird")]
 [assembly: System.Reflection.AssemblyProduct("Consulta SQL Firebird")]
-[assembly: System.Reflection.AssemblyVersion("0.2.42.0")]
-[assembly: System.Reflection.AssemblyFileVersion("0.2.42.0")]
-[assembly: System.Reflection.AssemblyInformationalVersion("v0.2.42")]
+[assembly: System.Reflection.AssemblyVersion("0.2.43.0")]
+[assembly: System.Reflection.AssemblyFileVersion("0.2.43.0")]
+[assembly: System.Reflection.AssemblyInformationalVersion("v0.2.43")]
 
 internal static class GeneratedFileUX {
     public static void AskOpenFolder(IWin32Window owner,string filePath,string title) {
@@ -1090,17 +1090,54 @@ internal sealed class SavedSqlEntry {
     }
     void UpdateTableSuggestions(bool force=false) {
         if(applyingTableSuggestion||tableSuggestionPopup==null||sqlBox==null)return;
-        int caret=sqlBox.SelectionStart;int contextStart=Math.Max(0,caret-4096);string before=sqlBox.Text.Substring(contextStart,caret-contextStart);int previousStatement=before.LastIndexOf(';');if(previousStatement>=0)before=before.Substring(previousStatement+1);Match tableContext=Regex.Match(before,@"(?is)\b(?:FROM|JOIN|UPDATE|INTO)\s+([A-Za-z0-9_$]*)$");Match qualified=Regex.Match(before,@"(?i)(?<qual>[A-Za-z][A-Za-z0-9_$]*)\.(?<prefix>[A-Za-z0-9_$]*)$");Match token=Regex.Match(before,@"[A-Za-z_][A-Za-z0-9_$]*$");string prefix=tableContext.Success?tableContext.Groups[1].Value:qualified.Success?qualified.Groups["prefix"].Value:token.Success?token.Value:"";
+        string previouslySelected="";
+        SqlCompletionSuggestion selectedItem=tableSuggestionList.SelectedItem as SqlCompletionSuggestion;
+        if(selectedItem!=null)previouslySelected=selectedItem.DisplayText;
+        int caret=sqlBox.SelectionStart,contextStart=Math.Max(0,caret-4096);
+        string before=sqlBox.Text.Substring(contextStart,caret-contextStart);
+        int previousStatement=before.LastIndexOf(';');
+        if(previousStatement>=0)before=before.Substring(previousStatement+1);
+        Match tableContext=Regex.Match(before,@"(?is)\b(?:FROM|JOIN|UPDATE|INTO)\s+([A-Za-z0-9_$]*)$");
+        Match qualified=Regex.Match(before,@"(?i)(?<qual>[A-Za-z][A-Za-z0-9_$]*)\.(?<prefix>[A-Za-z0-9_$]*)$");
+        Match token=Regex.Match(before,@"[A-Za-z_][A-Za-z0-9_$]*$");
+        string prefix=tableContext.Success?tableContext.Groups[1].Value:qualified.Success?qualified.Groups["prefix"].Value:token.Success?token.Value:"";
         if(prefix.Length<2&&!force){tableSuggestionPopup.Hide();return;}
         var candidates=new List<SqlCompletionSuggestion>();
         if(tableContext.Success){foreach(string name in tableNames)candidates.Add(new SqlCompletionSuggestion(name,name));}
         else{
-            string fullSql=sqlBox.Text;int statementStart=fullSql.LastIndexOf(';',Math.Max(0,caret-1))+1;int statementEnd=fullSql.IndexOf(';',caret);if(statementEnd<0)statementEnd=fullSql.Length;string statement=fullSql.Substring(statementStart,Math.Max(0,statementEnd-statementStart));var refs=GetReferencedTables(statement);
-            if(qualified.Success){string qualifier=qualified.Groups["qual"].Value;var matched=new HashSet<string>(StringComparer.OrdinalIgnoreCase);foreach(KeyValuePair<string,string> relation in refs)if(String.Equals(relation.Key,qualifier,StringComparison.OrdinalIgnoreCase)||String.Equals(relation.Value,qualifier,StringComparison.OrdinalIgnoreCase))matched.Add(relation.Value);foreach(string table in matched){List<string> fields;if(tableFields.TryGetValue(table,out fields))foreach(string field in fields)candidates.Add(new SqlCompletionSuggestion(field,field));}}
-            else{if(refs.Count==0)foreach(string keyword in sqlCompletionItems)candidates.Add(new SqlCompletionSuggestion(keyword,keyword));var distinctTables=new HashSet<string>(StringComparer.OrdinalIgnoreCase);foreach(KeyValuePair<string,string> relation in refs)distinctTables.Add(relation.Value);bool qualify=distinctTables.Count>1;foreach(KeyValuePair<string,string> relation in refs){List<string> fields;if(!tableFields.TryGetValue(relation.Value,out fields))continue;string qualifier=relation.Key;foreach(string field in fields){string insertion=qualify?qualifier+"."+field:field;string display=qualify?field+"  ["+qualifier+"]":field;candidates.Add(new SqlCompletionSuggestion(display,insertion));}}}
+            string fullSql=sqlBox.Text;
+            int statementStart=fullSql.LastIndexOf(';',Math.Max(0,caret-1))+1,statementEnd=fullSql.IndexOf(';',caret);
+            if(statementEnd<0)statementEnd=fullSql.Length;
+            string statement=fullSql.Substring(statementStart,Math.Max(0,statementEnd-statementStart));
+            var refs=GetReferencedTables(statement);
+            if(qualified.Success){
+                string qualifier=qualified.Groups["qual"].Value;var matched=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach(KeyValuePair<string,string> relation in refs)if(String.Equals(relation.Key,qualifier,StringComparison.OrdinalIgnoreCase)||String.Equals(relation.Value,qualifier,StringComparison.OrdinalIgnoreCase))matched.Add(relation.Value);
+                foreach(string table in matched){List<string> fields;if(tableFields.TryGetValue(table,out fields))foreach(string field in fields)candidates.Add(new SqlCompletionSuggestion(field,field));}
+            }else{
+                if(refs.Count==0)foreach(string keyword in sqlCompletionItems)candidates.Add(new SqlCompletionSuggestion(keyword,keyword));
+                var distinctTables=new HashSet<string>(StringComparer.OrdinalIgnoreCase);foreach(KeyValuePair<string,string> relation in refs)distinctTables.Add(relation.Value);
+                bool qualify=distinctTables.Count>1;
+                foreach(KeyValuePair<string,string> relation in refs){List<string> fields;if(!tableFields.TryGetValue(relation.Value,out fields))continue;string qualifier=relation.Key;foreach(string field in fields){string insertion=qualify?qualifier+"."+field:field;string display=qualify?field+"  ["+qualifier+"]":field;candidates.Add(new SqlCompletionSuggestion(display,insertion));}}
+            }
         }
-        tableSuggestionList.BeginUpdate();tableSuggestionList.Items.Clear();var seen=new HashSet<string>(StringComparer.OrdinalIgnoreCase);int added=0;foreach(SqlCompletionSuggestion item in candidates){if(item.DisplayText.StartsWith(prefix,StringComparison.OrdinalIgnoreCase)&&seen.Add(item.DisplayText)){tableSuggestionList.Items.Add(item);if(++added>=80)break;}}tableSuggestionList.EndUpdate();
-        if(tableSuggestionList.Items.Count==0){tableSuggestionPopup.Hide();return;}tableSuggestionList.SelectedIndex=0;Point caretPoint=sqlBox.PointToScreen(sqlBox.GetPositionFromCharIndex(caret));Point popupPoint=new Point(caretPoint.X,caretPoint.Y+sqlBox.Font.Height+2);tableSuggestionPopup.Location=PointToClient(popupPoint);tableSuggestionPopup.Height=180;if(!tableSuggestionPopup.Visible)tableSuggestionPopup.Show();tableSuggestionPopup.BringToFront();
+        tableSuggestionList.BeginUpdate();tableSuggestionList.Items.Clear();
+        var seen=new HashSet<string>(StringComparer.OrdinalIgnoreCase);int added=0;
+        foreach(SqlCompletionSuggestion item in candidates){if(item.DisplayText.StartsWith(prefix,StringComparison.OrdinalIgnoreCase)&&seen.Add(item.DisplayText)){tableSuggestionList.Items.Add(item);if(++added>=80)break;}}
+        tableSuggestionList.EndUpdate();
+        if(tableSuggestionList.Items.Count==0){tableSuggestionPopup.Hide();return;}
+        int selectedIndex=0;
+        if(!force&&previouslySelected.Length>0){
+            for(int i=0;i<tableSuggestionList.Items.Count;i++){
+                SqlCompletionSuggestion item=tableSuggestionList.Items[i] as SqlCompletionSuggestion;
+                if(item!=null&&String.Equals(item.DisplayText,previouslySelected,StringComparison.OrdinalIgnoreCase)){selectedIndex=i;break;}
+            }
+        }
+        tableSuggestionList.SelectedIndex=selectedIndex;
+        Point caretPoint=sqlBox.PointToScreen(sqlBox.GetPositionFromCharIndex(caret));
+        Point popupPoint=new Point(caretPoint.X,caretPoint.Y+sqlBox.Font.Height+2);
+        tableSuggestionPopup.Location=PointToClient(popupPoint);tableSuggestionPopup.Height=180;
+        if(!tableSuggestionPopup.Visible)tableSuggestionPopup.Show();tableSuggestionPopup.BringToFront();
     }
     void SqlBoxSuggestionKeyDown(object sender,KeyEventArgs e) {
         if(e.Control&&e.KeyCode==Keys.Space){UpdateTableSuggestions(true);e.Handled=true;e.SuppressKeyPress=true;return;}
