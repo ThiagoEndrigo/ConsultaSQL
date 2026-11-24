@@ -14,9 +14,9 @@ using System.Windows.Forms;
 
 [assembly: System.Reflection.AssemblyTitle("Consulta SQL Firebird")]
 [assembly: System.Reflection.AssemblyProduct("Consulta SQL Firebird")]
-[assembly: System.Reflection.AssemblyVersion("0.2.45.0")]
-[assembly: System.Reflection.AssemblyFileVersion("0.2.45.0")]
-[assembly: System.Reflection.AssemblyInformationalVersion("v0.2.45")]
+[assembly: System.Reflection.AssemblyVersion("0.2.46.0")]
+[assembly: System.Reflection.AssemblyFileVersion("0.2.46.0")]
+[assembly: System.Reflection.AssemblyInformationalVersion("v0.2.46")]
 
 internal static class GeneratedFileUX {
     public static void AskOpenFolder(IWin32Window owner,string filePath,string title) {
@@ -1266,7 +1266,7 @@ internal sealed class SavedSqlEntry {
         for(int rowIndex=table.Rows.Count-1;rowIndex>=0;rowIndex--){DataRow row=table.Rows[rowIndex];bool hasVisibleValue=false;foreach(DataColumn column in table.Columns){if(String.Equals(column.ColumnName,DbKeyLocatorColumn,StringComparison.OrdinalIgnoreCase)||column.ColumnName.StartsWith("CS_INTERNAL_DB_KEY",StringComparison.OrdinalIgnoreCase))continue;if(row.IsNull(column))continue;string value=Convert.ToString(row[column]);if(!String.IsNullOrWhiteSpace(value)&&!String.Equals(value.Trim(),"<null>",StringComparison.OrdinalIgnoreCase)){hasVisibleValue=true;break;}}if(!hasVisibleValue)table.Rows.RemoveAt(rowIndex);}
     }
     static bool IsIsqlFieldName(string key) { return !String.IsNullOrWhiteSpace(key)&&key.Length<=128&&(Regex.IsMatch(key,@"^[A-Za-z][A-Za-z0-9_$]*$")||Regex.IsMatch(key,@"^""(?:""""|[^""])+""$")); }
-    static bool TryParseIsqlFieldLine(string line,out string key,out string value) { key=null;value=null;if(String.IsNullOrWhiteSpace(line))return false;int equals=line.IndexOf(" = ",StringComparison.Ordinal);if(equals>0){key=line.Substring(0,equals).Trim();value=line.Substring(equals+3).Trim();}else{Match pair=Regex.Match(line,@"^\s*(?<key>""(?:""""|[^""])+""|[A-Za-z][A-Za-z0-9_$]*)[ \t]{2,}(?<value>.*)$");if(!pair.Success)return false;key=pair.Groups["key"].Value.Trim();value=pair.Groups["value"].Value.Trim();}return IsIsqlFieldName(key); }
+    static bool TryParseIsqlFieldLine(string line,out string key,out string value) { key=null;value=null;if(String.IsNullOrWhiteSpace(line))return false;int equals=line.IndexOf(" = ",StringComparison.Ordinal);if(equals>0){key=line.Substring(0,equals).Trim();value=line.Substring(equals+3).Trim();}else{Match pair=Regex.Match(line,@"^\s*(?<key>""(?:""""|[^""])+""|[A-Za-z][A-Za-z0-9_$]*)(?<separator>[ \t]+)(?<value>.*)$");if(!pair.Success)return false;key=pair.Groups["key"].Value.Trim();value=pair.Groups["value"].Value.Trim();if(pair.Groups["separator"].Length==1&&key.Trim('"').Length!=31)return false;}return IsIsqlFieldName(key); }
     internal static DataTable RunSelectIsql(string sql,string exe,string database,string password,out string diagnostic) { return RunSelectIsql(sql,exe,database,password,null,out diagnostic); }
     internal static DataTable RunSelectIsql(string sql,string exe,string database,string password,Func<DataTable,List<Dictionary<string,string>>,bool> onBatch,out string diagnostic) { return RunSelectIsql(sql,exe,database,password,onBatch,CancellationToken.None,out diagnostic); }
     internal static DataTable RunSelectIsql(string sql,string exe,string database,string password,Func<DataTable,List<Dictionary<string,string>>,bool> onBatch,CancellationToken cancellationToken,out string diagnostic) {
